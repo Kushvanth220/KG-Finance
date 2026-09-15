@@ -1,0 +1,431 @@
+/*
+ * The landing page's own stage.
+ *
+ * Deliberately a single world — near-black, lit from within — because the
+ * page exists to show the app, and the app is dark glass. Every colour is
+ * painted explicitly so the page holds on any host ground.
+ */
+
+.intro {
+  --intro-ink: #f5f5f7;
+  --intro-muted: rgba(235, 235, 245, 0.62);
+  --intro-glass: rgba(44, 44, 46, 0.62);
+  --intro-edge: rgba(255, 255, 255, 0.11);
+  --intro-blue: #007aff;
+  --intro-indigo: #5856d6;
+  --intro-purple: #af52de;
+  --intro-green: #34c759;
+  --intro-flex: #0077ff;
+
+  background: #050508;
+  color: var(--intro-ink);
+  min-height: 100dvh;
+  overflow-x: hidden;
+}
+
+/* ---------- ambient ---------- */
+.intro-ambient {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 70% 45% at 18% 12%, rgba(0, 122, 255, 0.22), transparent 70%),
+    radial-gradient(ellipse 55% 40% at 85% 6%, rgba(88, 86, 214, 0.18), transparent 70%),
+    radial-gradient(ellipse 50% 50% at 50% 95%, rgba(52, 199, 89, 0.07), transparent 70%);
+}
+
+.intro > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ---------- top bar ---------- */
+.intro-bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 20px;
+  background: rgba(5, 5, 8, 0.55);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  backdrop-filter: blur(18px) saturate(160%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.intro-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, var(--intro-blue), var(--intro-indigo));
+  box-shadow: 0 8px 28px rgba(0, 122, 255, 0.28);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.intro-cta:hover { transform: translateY(-1px); box-shadow: 0 12px 32px rgba(0, 122, 255, 0.4); }
+.intro-cta:focus-visible { outline: 2px solid var(--intro-purple); outline-offset: 3px; }
+.intro-cta.is-ghost {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--intro-edge);
+  box-shadow: none;
+}
+
+/* ---------- hero ---------- */
+.intro-hero {
+  position: relative;
+  min-height: 78dvh;
+  display: grid;
+  align-items: end;
+  padding: 24px 20px 56px;
+  isolation: isolate;
+}
+.intro-hero-scene {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+.intro-hero-scene canvas { display: block; width: 100%; height: 100%; }
+.intro-hero-copy {
+  position: relative;
+  z-index: 1;
+  max-width: 34rem;
+  animation: intro-rise 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 0.15s;
+}
+.intro-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--intro-blue);
+}
+.intro-h1 {
+  margin: 10px 0 0;
+  font-size: clamp(34px, 6.4vw, 60px);
+  line-height: 1.02;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+.intro-h1 em {
+  font-style: normal;
+  background: linear-gradient(135deg, #4da3ff, #8b7cff 55%, #d67cff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.intro-lede {
+  margin: 16px 0 0;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--intro-muted);
+  max-width: 30rem;
+}
+.intro-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
+
+/* The copy on its own plane, in front of the rings. */
+.intro-parallax {
+  transform: translate(calc(var(--px, 0) * -16px), calc(var(--py, 0) * -10px));
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+}
+.intro-hero-hint {
+  position: absolute;
+  top: 18px;
+  right: 20px;
+  z-index: 1;
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--intro-muted);
+  pointer-events: none;
+}
+
+@keyframes intro-rise {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---------- sections ---------- */
+.intro-section {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 72px 20px;
+}
+.intro-section + .intro-section { border-top: 1px solid rgba(255, 255, 255, 0.05); }
+.intro-h2 {
+  margin: 0;
+  font-size: clamp(24px, 3.6vw, 34px);
+  line-height: 1.12;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+.intro-p {
+  margin: 12px 0 0;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--intro-muted);
+  max-width: 34rem;
+}
+
+/* Sections fade up as they enter, only in browsers that can do it without
+   script — everywhere else they are simply there. Never parked invisible. */
+@supports (animation-timeline: view()) {
+  .intro-reveal {
+    animation: intro-reveal linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 35%;
+  }
+}
+@keyframes intro-reveal {
+  from { opacity: 0.001; transform: translateY(18px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---------- phone ---------- */
+.intro-split {
+  display: grid;
+  gap: 40px;
+  align-items: center;
+}
+@media (min-width: 860px) {
+  .intro-split { grid-template-columns: 1.05fr 0.95fr; gap: 56px; }
+}
+
+.intro-stage {
+  position: relative;
+  perspective: 1400px;
+  display: grid;
+  place-items: center;
+  padding: 24px 0 40px;
+  touch-action: pan-y;
+}
+.intro-phone {
+  position: relative;
+  width: min(300px, 70vw);
+  aspect-ratio: 390 / 844;
+  border-radius: 44px;
+  background: #0b0b10;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow:
+    0 0 0 6px #17171d,
+    0 40px 90px rgba(0, 0, 0, 0.7),
+    0 0 80px rgba(0, 122, 255, 0.16);
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+.intro-phone-screen {
+  position: absolute;
+  inset: 10px;
+  border-radius: 36px;
+  overflow: hidden;
+  background: #000;
+  transform: translateZ(18px);
+}
+.intro-phone-screen svg { display: block; }
+.intro-phone-notch {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  width: 92px;
+  height: 26px;
+  border-radius: 14px;
+  background: #000;
+  transform: translate(-50%, 0) translateZ(22px);
+}
+.intro-phone-glare {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(115deg, rgba(255, 255, 255, 0.09) 0%, transparent 35%, transparent 70%, rgba(255, 255, 255, 0.04) 100%);
+  transform: translateZ(26px);
+}
+.intro-phone-shadow {
+  position: absolute;
+  bottom: 12px;
+  width: min(260px, 55vw);
+  height: 30px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(0, 122, 255, 0.35), transparent 70%);
+  filter: blur(14px);
+}
+
+/* ---------- feature grid ---------- */
+.intro-grid {
+  display: grid;
+  gap: 14px;
+  margin-top: 32px;
+}
+@media (min-width: 640px) { .intro-grid { grid-template-columns: repeat(2, 1fr); } }
+
+.intro-card {
+  display: flex;
+  flex-direction: column;
+  border-radius: 20px;
+  background: var(--intro-glass);
+  border: 1px solid var(--intro-edge);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+.intro-card-art {
+  height: 200px;
+  padding: 18px;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.25);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.intro-card-art > * { max-height: 100%; }
+.intro-card-body { padding: 16px 18px 18px; }
+.intro-card-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.intro-card-kicker i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.intro-card h3 { margin: 6px 0 0; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+.intro-card p { margin: 6px 0 0; font-size: 13.5px; line-height: 1.55; color: var(--intro-muted); }
+
+/* Jarvis orb */
+.intro-orb {
+  position: relative;
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #007aff, #5856d6 55%, #af52de);
+  box-shadow: 0 0 40px rgba(0, 122, 255, 0.55), 0 0 90px rgba(175, 82, 222, 0.35);
+}
+.intro-orb::after {
+  content: "";
+  position: absolute;
+  inset: 22px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  mask: radial-gradient(circle, #000 30%, transparent 32%), linear-gradient(#000, #000);
+  -webkit-mask: radial-gradient(circle, #000 30%, transparent 32%), linear-gradient(#000, #000);
+  mask-composite: exclude;
+  -webkit-mask-composite: xor;
+  opacity: 0.9;
+}
+.intro-orb-ring {
+  position: absolute;
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(0, 122, 255, 0.6);
+  animation: intro-ripple 2.7s ease-out infinite;
+}
+@keyframes intro-ripple {
+  from { transform: scale(1); opacity: 0.7; }
+  to { transform: scale(2.4); opacity: 0; }
+}
+
+/* ---------- card stack ---------- */
+.intro-stack { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.intro-stack-stage {
+  position: relative;
+  width: min(300px, 74vw);
+  aspect-ratio: 1.586 / 1;
+  /* Shifted left so the cards fanned behind have room on the right. */
+  margin: 24px auto 8px;
+  transform: translateX(-28px);
+}
+.intro-stack-card {
+  position: absolute;
+  inset: 0;
+  transform-origin: 40% 60%;
+}
+.intro-stack-controls { display: flex; align-items: center; gap: 10px; }
+.intro-stack-btn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  color: var(--intro-ink);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--intro-edge);
+  cursor: pointer;
+}
+.intro-stack-btn:hover { background: rgba(255, 255, 255, 0.1); }
+.intro-stack-btn:focus-visible { outline: 2px solid var(--intro-purple); outline-offset: 2px; }
+.intro-stack-dots { display: flex; gap: 6px; }
+.intro-stack-dots button {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 0;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.22);
+  cursor: pointer;
+  transition: transform 0.2s, background 0.2s;
+}
+.intro-stack-dots button.is-on { background: var(--intro-blue); transform: scale(1.35); }
+.intro-stack-dots button:focus-visible { outline: 2px solid var(--intro-purple); outline-offset: 3px; }
+.intro-stack-hint { margin: 0; font-size: 11.5px; color: var(--intro-muted); }
+
+/* ---------- film ---------- */
+.intro-film {
+  margin-top: 28px;
+  border-radius: 24px;
+  overflow: hidden;
+  border: 1px solid var(--intro-edge);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6), 0 0 60px rgba(88, 86, 214, 0.15);
+  aspect-ratio: 16 / 9;
+  background: #050508;
+}
+.intro-film > * { width: 100%; height: 100%; display: block; }
+
+/* ---------- facts ---------- */
+.intro-facts {
+  display: grid;
+  gap: 12px;
+  margin-top: 28px;
+}
+@media (min-width: 640px) { .intro-facts { grid-template-columns: repeat(3, 1fr); } }
+.intro-fact {
+  border-radius: 16px;
+  padding: 16px 18px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+.intro-fact b { display: block; font-size: 15px; font-weight: 600; }
+.intro-fact span { display: block; margin-top: 4px; font-size: 13px; color: var(--intro-muted); line-height: 1.5; }
+
+/* ---------- foot ---------- */
+.intro-foot {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 40px 20px 56px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12.5px;
+  color: var(--intro-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .intro-hero-copy { animation: none; }
+  .intro-orb-ring { animation: none; opacity: 0.35; transform: scale(1.5); }
+  .intro-cta { transition: none; }
+  .intro-reveal { animation: none; }
+  .intro-parallax { transform: none; transition: none; }
+}

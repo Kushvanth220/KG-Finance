@@ -1,0 +1,48 @@
+import type { FinanceState, SpendCategory } from "@/types";
+
+/**
+ * What a brand-new workspace starts with: no accounts, no history, and a
+ * handful of spend categories so the Spend page is usable straight away.
+ * Everything else is created by the people using the app, then synced.
+ */
+export const DEFAULT_SPEND_CATEGORIES: SpendCategory[] = [
+  { id: "cat-groceries", name: "Groceries" },
+  { id: "cat-food", name: "Food & dining" },
+  { id: "cat-gas", name: "Gas" },
+  { id: "cat-rent", name: "Rent" },
+  { id: "cat-utilities", name: "Utilities" },
+  { id: "cat-subscriptions", name: "Subscriptions" },
+  { id: "cat-shopping", name: "Shopping" },
+  { id: "cat-transport", name: "Transport" },
+  { id: "cat-health", name: "Health" },
+  { id: "cat-entertainment", name: "Entertainment" },
+  { id: "cat-cash", name: "Cash withdrawal" },
+  { id: "cat-debt", name: "Debt payment" },
+  { id: "cat-other", name: "Other" },
+];
+
+export function createEmptyFinanceState(): FinanceState {
+  return {
+    incomeSources: [],
+    incomeEntries: [],
+    spendCategories: DEFAULT_SPEND_CATEGORIES.map((category) => ({ ...category })),
+    monthlyExpenses: [],
+    accounts: [],
+    debts: [],
+    transactions: [],
+    settlementHistory: [],
+    settlementBalance: 0,
+    deletedHistory: [],
+    flexDeposits: [],
+  };
+}
+
+/** Fill in the collections that older records may lack, so every reader can assume they exist. */
+export function normalizeFinanceState(state: FinanceState): FinanceState {
+  return {
+    ...state,
+    deletedHistory: state.deletedHistory ?? [],
+    spendCategories: state.spendCategories ?? [],
+    greenDotTrackingStartDate: state.greenDotTrackingStartDate,
+  };
+}
