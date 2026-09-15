@@ -8,6 +8,7 @@ import {
 } from "@/lib/supabase/client";
 import type { FinanceState } from "@/types";
 import { pickRicherState, readLocalFinanceBackup, scoreFinanceState } from "@/lib/recover-finance-data";
+import { isPristineFinanceState } from "@/lib/default-state";
 import { mergeFinanceStates } from "@/lib/finance-merge";
 
 /** Bumped to reset stale per-device sync timestamps from older builds. */
@@ -547,6 +548,17 @@ async function pushLocalState(workspaceId: string, getState: () => FinanceState)
   const localState = getState();
   const stamp = await fetchRemoteStamp(workspaceId);
 
+  // Nothing recorded here yet and the cloud has a record: there is nothing to
+  // send. Take the cloud instead — an untouched device never overwrites or
+  // merges into the shared ledger.
+  if (stamp && sessionPullConfig && isPristineFinanceState(localState)) {
+    const remote = await fetchRemoteFinance(workspaceId);
+    if (remote) {
+      applyRemoteRow(remote, sessionPullConfig.applyRemoteState);
+      return;
+    }
+  }
+
   if (stamp && sessionPullConfig) {
     const base = readSyncBase();
     // Stamps agree: the cloud still holds exactly our base, so nothing needs
@@ -722,6 +734,16 @@ export async function resolveInitialSync(
     await pushFinanceState(workspaceId, localState, { skipSafetyCheck: true });
     notifyStatus("synced");
     return "local";
+  }
+
+  // A phone that has never recorded anything — a fresh install, or storage
+  // that was cleared — simply adopts the cloud. Merging here would treat its
+  // starter categories as additions and push them into the shared list. This
+  // is judged on content alone: the "local edit" flag also trips on internal
+  // store updates, so it cannot be trusted to say the device is untouched.
+  if (isPristineFinanceState(localState)) {
+    applyRemoteRow(remote, applyRemoteState);
+    return "remote";
   }
 
   const moved = cloudMovedSince(remote, meta);

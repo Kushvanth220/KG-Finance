@@ -208,7 +208,8 @@ After changing environment variables on Vercel, **Redeploy** so the new values a
 | `npm run lint` | ESLint (Next + React Compiler rules) |
 | `npm test` / `npm run test:watch` | Vitest unit tests |
 | `npm run backup:supabase` | Download the workspace row to `backups/<stamp>/` (git-ignored) |
-| `npm run restore:supabase -- backups/<folder>/workspace-finance.json` | Upload a backup to Supabase |
+| `npm run restore:supabase -- backups/<folder>/workspace-finance.json` | Upload a finance backup to Supabase |
+| `npm run restore:workspace -- <folder> [--dry-run]` | Restore a whole workspace (finance, rules, assistant, chats) into a fresh project |
 
 ---
 

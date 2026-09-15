@@ -37,6 +37,29 @@ export function createEmptyFinanceState(): FinanceState {
   };
 }
 
+/**
+ * True when nothing has ever been recorded on this device: every collection is
+ * empty and the only categories are the starter set above. Such a device must
+ * adopt the cloud wholesale — merging it would push the starter categories into
+ * the shared list, because a merge without a base cannot tell "new here" from
+ * "never existed".
+ */
+export function isPristineFinanceState(state: FinanceState): boolean {
+  const empty = (list: unknown[] | undefined) => !list || list.length === 0;
+  return (
+    empty(state.transactions) &&
+    empty(state.incomeEntries) &&
+    empty(state.incomeSources) &&
+    empty(state.accounts) &&
+    empty(state.debts) &&
+    empty(state.monthlyExpenses) &&
+    empty(state.settlementHistory) &&
+    empty(state.deletedHistory) &&
+    empty(state.flexDeposits) &&
+    (state.spendCategories ?? []).every((category) => category.id.startsWith("cat-"))
+  );
+}
+
 /** Fill in the collections that older records may lack, so every reader can assume they exist. */
 export function normalizeFinanceState(state: FinanceState): FinanceState {
   return {

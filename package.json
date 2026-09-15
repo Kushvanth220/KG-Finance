@@ -11,6 +11,7 @@
     "lint": "eslint",
     "backup:supabase": "node scripts/backup-supabase-data.mjs",
     "restore:supabase": "node scripts/restore-supabase-data.mjs",
+    "restore:workspace": "node scripts/restore-workspace.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },
