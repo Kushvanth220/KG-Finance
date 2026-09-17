@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useAssistantName } from "@/store/assistant-preferences-store";
 import { GlassModal } from "@/components/ui/glass-modal";
 import { GlassButton } from "@/components/ui/glass-button";
 import {
@@ -42,6 +43,7 @@ export function ReminderEditor({
   onSave: (draft: Omit<Reminder, "id">) => void;
   onClose: () => void;
 }) {
+  const assistantName = useAssistantName();
   const [text, setText] = useState(initial?.text ?? "");
   const [repeat, setRepeat] = useState<ReminderRepeat>(initial?.repeat ?? "monthly");
   const [date, setDate] = useState(initial?.date ?? "");
@@ -81,7 +83,7 @@ export function ReminderEditor({
     >
       <div className="space-y-3">
         <div>
-          <label className={label}>What should Jarvis remind you about?</label>
+          <label className={label}>What should {assistantName} remind you about?</label>
           <input
             value={text}
             onChange={(event) => setText(event.target.value)}
@@ -242,7 +244,7 @@ export function ReminderEditor({
         {/* Say back exactly what was built, so nothing is a surprise later. */}
         <div className="rounded-xl border border-[#007aff]/25 bg-[#007aff]/[0.07] px-3 py-2">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-[#007aff]">
-            Jarvis will remember
+            {assistantName} will remember
           </p>
           <p className="mt-0.5 text-[12px]">
             {text.trim() || "…"} — {describeSchedule(preview)}

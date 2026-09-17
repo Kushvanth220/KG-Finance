@@ -7,7 +7,7 @@ import { formatCurrency } from "@/lib/formatters";
 import type { AiUsageSummary } from "@/lib/ai/usage";
 
 /**
- * What Jarvis cost this month, by model.
+ * What the assistant cost this month, by model.
  *
  * Priced from list rates, so it is an estimate — close enough to notice a
  * bad week, not a substitute for the provider's own bill.

@@ -57,7 +57,7 @@ export function AssistantNameSetup({ onComplete }: AssistantNameSetupProps) {
                 Pick a name
               </GlassButton>
               <GlassButton type="button" variant="ghost" onClick={useDefaultName}>
-                Skip — use Jarvis
+                Skip — call it Assistant
               </GlassButton>
             </div>
           </>
@@ -83,7 +83,7 @@ export function AssistantNameSetup({ onComplete }: AssistantNameSetupProps) {
                   saveCustomName();
                 }
               }}
-              placeholder='e.g. "Jarvis", "GG", "Finny"'
+              placeholder='e.g. "Nova", "Finny", "Max"'
               className="glass w-full rounded-2xl px-4 py-3 text-sm outline-none text-left"
               autoFocus
               maxLength={32}

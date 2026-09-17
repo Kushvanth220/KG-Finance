@@ -17,7 +17,10 @@ import { ASSISTANT_LANGUAGE } from "@/lib/ai/live-config";
 import type { Person } from "@/types";
 
 const STORAGE_KEY = "kg-finance-assistant-prefs-v1";
-const DEFAULT_NAME = "Jarvis";
+import { DEFAULT_ASSISTANT_NAME } from "@/lib/ai/assistant-name";
+
+export { DEFAULT_ASSISTANT_NAME };
+const DEFAULT_NAME = DEFAULT_ASSISTANT_NAME;
 
 interface AssistantPreferencesState {
   assistantName: string;
@@ -403,4 +406,10 @@ export function getRemindersForAssistant(): string[] {
 /** Structured reminders, for anything that needs real dates (briefing, UI). */
 export function getStructuredReminders(): Reminder[] {
   return useAssistantPreferencesStore.getState().structuredReminders;
+}
+
+/** The assistant's display name — the chosen one, or the default while unnamed. */
+export function useAssistantName(): string {
+  const name = useAssistantPreferencesStore((state) => state.assistantName);
+  return name.trim() || DEFAULT_ASSISTANT_NAME;
 }

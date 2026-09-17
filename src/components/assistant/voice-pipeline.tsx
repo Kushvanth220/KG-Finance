@@ -10,7 +10,7 @@ import type { AssistantLiveOrbState } from "@/components/assistant/assistant-liv
  * Gemini Live only — ChatGPT and Claude answer on text — so showing three
  * layers here would be drawing something that never happens. What it shows is
  * the pipeline that genuinely runs: your mic, the live model, the app's own
- * tools when a money action fires, and Jarvis speaking back.
+ * tools when a money action fires, and the assistant speaking back.
  *
  * Every segment lights from a real signal, never a timer.
  */
@@ -25,7 +25,7 @@ interface VoicePipelineProps {
   className?: string;
 }
 
-const NODES = ["You", "Gemini", "Tools", "Jarvis"] as const;
+const NODES = ["You", "Gemini", "Tools", "Reply"] as const;
 
 export function VoicePipeline({ state, toolBusy, active, className }: VoicePipelineProps) {
   const connecting = state === "connecting";
@@ -37,7 +37,7 @@ export function VoicePipeline({ state, toolBusy, active, className }: VoicePipel
   const legLive = [
     active && listening,                 // You -> Gemini
     active && (thinking || speaking),    // Gemini -> Tools
-    active && speaking,                  // Tools -> Jarvis
+    active && speaking,                  // Tools -> Reply
   ];
 
   const nodeLive = [
@@ -54,7 +54,7 @@ export function VoicePipeline({ state, toolBusy, active, className }: VoicePipel
       : thinking
         ? "Running an app tool…"
         : speaking
-          ? "Jarvis is answering"
+          ? "Answering"
           : listening
             ? "Listening on your mic"
             : "Live";

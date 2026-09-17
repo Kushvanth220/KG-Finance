@@ -6,6 +6,7 @@ import { CompactPageShell } from "@/components/ui/compact-page-shell";
 import { GlassCard } from "@/components/ui/glass-card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { FlexDepositsCard } from "@/components/flex/flex-deposits-card";
+import { FlexDayDepositControl, useFlexDayDeposits } from "@/components/flex/flex-day-deposit";
 import { useActiveBlock } from "@/hooks/use-active-block";
 import { zonedClockNow } from "@/lib/zoned-date";
 import { StackedChart, type StackedChartType } from "@/components/charts/stacked-chart";
@@ -21,6 +22,7 @@ import type { RuleEntry } from "@/lib/rules/types";
 import { formatClock, formatCurrency, formatDate, formatShortDate } from "@/lib/formatters";
 import { roundMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { useAssistantName } from "@/store/assistant-preferences-store";
 
 /**
  * Amazon Flex — the whole job on one screen.
@@ -129,6 +131,7 @@ function prettyDate(date: string): string {
 }
 
 export default function FlexPage() {
+  const assistantName = useAssistantName();
   const rules = useRulesStore((state) => state.rules);
   const entries = useRulesStore((state) => state.entries);
   const addRule = useRulesStore((state) => state.addRule);
@@ -275,6 +278,8 @@ export default function FlexPage() {
       pending: list.filter((b) => b.tip === null).length,
     }));
   }, [inWindow]);
+
+  const dayDeposits = useFlexDayDeposits(flex, entries);
 
   if (!flex) return null;
 
@@ -533,7 +538,7 @@ export default function FlexPage() {
         {days.length === 0 ? (
           <p className="px-4 py-6 text-center text-[11px] text-muted">
             {blocks.length === 0
-              ? "Nothing logged yet. Tap “Log a block”, or just tell Jarvis."
+              ? `Nothing logged yet. Tap “Log a block”, or just tell ${assistantName}.`
               : "No blocks in this window."}
           </p>
         ) : (
@@ -543,30 +548,38 @@ export default function FlexPage() {
               return (
                 <div key={day.date}>
                   {/* One line per DAY. A five-block day was five rows before. */}
-                  <button
-                    type="button"
-                    onClick={() => setOpenDay(expanded ? null : day.date)}
-                    className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
-                  >
-                    <ChevronDown
-                      className={cn(
-                        "h-3.5 w-3.5 shrink-0 text-muted transition-transform",
-                        expanded && "rotate-180"
-                      )}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[13px] font-medium">{prettyDate(day.date)}</p>
-                      <p className="text-[10px] text-muted">
-                        {day.list.length} {day.list.length === 1 ? "block" : "blocks"} · {day.hours}h
-                        {day.pending > 0 ? (
-                          <span className="text-[#ff9500]"> · {day.pending} tip pending</span>
-                        ) : null}
+                  <div className="flex items-center gap-2 pr-3 hover:bg-black/[0.03] dark:hover:bg-white/[0.04]">
+                    <button
+                      type="button"
+                      onClick={() => setOpenDay(expanded ? null : day.date)}
+                      className="flex min-w-0 flex-1 items-center gap-3 py-2.5 pl-4 text-left"
+                    >
+                      <ChevronDown
+                        className={cn(
+                          "h-3.5 w-3.5 shrink-0 text-muted transition-transform",
+                          expanded && "rotate-180"
+                        )}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[13px] font-medium">{prettyDate(day.date)}</p>
+                        <p className="text-[10px] text-muted">
+                          {day.list.length} {day.list.length === 1 ? "block" : "blocks"} · {day.hours}h
+                          {day.pending > 0 ? (
+                            <span className="text-[#ff9500]"> · {day.pending} tip pending</span>
+                          ) : null}
+                        </p>
+                      </div>
+                      <p className="shrink-0 text-[14px] font-semibold tabular-nums">
+                        {formatCurrency(day.total)}
                       </p>
-                    </div>
-                    <p className="shrink-0 text-[14px] font-semibold tabular-nums">
-                      {formatCurrency(day.total)}
-                    </p>
-                  </button>
+                    </button>
+                    <FlexDayDepositControl
+                      rule={flex}
+                      date={day.date}
+                      status={dayDeposits.statusFor(day.date)}
+                      today={dayDeposits.today}
+                    />
+                  </div>
 
                   {expanded ? (
                     <div className="bg-black/[0.02] px-4 pb-2 dark:bg-white/[0.03]">

@@ -57,6 +57,7 @@ import {
 import { formatChatWhen } from "@/lib/ai/chat-time";
 import { useAssistant } from "@/components/assistant/assistant-context";
 import { useFinanceStore } from "@/store/finance-store";
+import { DEFAULT_ASSISTANT_NAME } from "@/lib/ai/assistant-name";
 
 const DEFAULT_CHAT_USER: Person = "kushvanth";
 const BARGE_IN_LEVEL = 0.38;
@@ -153,7 +154,7 @@ function orbCaption(
 }
 
 export function AiVoicePanel({
-  assistantName = "Jarvis",
+  assistantName = DEFAULT_ASSISTANT_NAME,
   voiceGender = "female",
   autoStart = false,
   onAutoStartHandled,

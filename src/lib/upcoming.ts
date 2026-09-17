@@ -4,7 +4,7 @@ import type { MonthlyExpense, Person, Transaction } from "@/types";
 
 /**
  * What is about to land: bills from Memory's list and reminders from
- * Jarvis's, each with how many days away it is. The home page's "Coming up"
+ * the assistant's, each with how many days away it is. The home page's "Coming up"
  * strip and the greeting's one-line nudge read the same list, so they can
  * never disagree about what is due.
  */

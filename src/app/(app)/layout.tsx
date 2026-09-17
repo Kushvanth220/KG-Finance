@@ -7,7 +7,7 @@ import { SyncReadyGate } from "@/components/sync/sync-ready-gate";
 import { SyncBanner } from "@/components/sync/sync-banner";
 
 /**
- * Every screen of the app: header, tab bar, sync, splash, Jarvis. Routes
+ * Every screen of the app: header, tab bar, sync, splash, the assistant. Routes
  * outside this group (the intro) get none of it, by construction rather than
  * by checking the path.
  */

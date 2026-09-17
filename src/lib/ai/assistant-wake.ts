@@ -1,3 +1,4 @@
+import { DEFAULT_ASSISTANT_NAME } from "@/lib/ai/assistant-name";
 import type { Person } from "@/types";
 
 export const ASSISTANT_MIC_READY_EVENT = "assistant-mic-ready";
@@ -17,6 +18,8 @@ export const WAKE_GREETINGS = [
   "okay",
 ] as const;
 
+// Speech-to-text spellings of a few popular assistant names, used only when
+// that name is the one chosen in Memory.
 const JARVIS_ALIASES = [
   "jarvis",
   "jar vis",
@@ -91,7 +94,7 @@ function nameMatchesText(text: string, assistantName: string): boolean {
   return false;
 }
 
-/** "Hey Jarvis", "Hi Jarvis", "hellojarvis" (no space), or the name alone. */
+/** "Hey <name>", "Hi <name>", "hello<name>" (no space), or the name alone. */
 export function transcriptContainsWakePhrase(transcript: string, assistantName: string): boolean {
   const text = normalizeWakeText(transcript);
   if (!text) return false;
@@ -124,7 +127,7 @@ export function formatWakePhrase(assistantName: string): string {
 }
 
 export function formatWakeHint(assistantName: string): string {
-  const name = assistantName.trim() || "Jarvis";
+  const name = assistantName.trim() || DEFAULT_ASSISTANT_NAME;
   return `Hey / Hi / Hello ${name} (or hey${name.toLowerCase()})`;
 }
 

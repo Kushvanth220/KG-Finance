@@ -1,29 +1,34 @@
 import type { Rule, RuleEntry } from "@/lib/rules/types";
-import type { FlexDeposit, FlexDepositPart, IncomeEntry } from "@/types";
+import type { FlexDeposit, FlexDepositPart, IncomeEntry, IncomeSource } from "@/types";
 import { resolveEntry } from "@/lib/rules/engine";
 import { roundMoney } from "@/lib/money";
-import { flexIncomeIds } from "@/lib/flex-income";
+import { flexIncomeIds, isFlexSource } from "@/lib/flex-income";
 
 /**
- * Flex payouts: when the money actually lands, and whether it did.
+ * Flex payouts: what the blocks say was earned, against what was actually
+ * recorded as Flex income.
  *
- * Amazon pays Flex drivers twice a week — Tuesday and Friday — for the blocks
- * finished before the cut-off. So a block is EARNED the day it is driven and
- * DEPOSITED days later. Writing the income the moment a block was logged put
- * the bank balance in the app ahead of the real one for up to four days.
- *
- * This module keeps the two apart:
+ * A block is EARNED the day it is driven and lands in the bank a day or two
+ * later; the driver records the money as Flex income when it shows up. This
+ * module matches those two streams so nothing is counted twice and nothing
+ * is forgotten:
  *  - every block splits into parts (base pay; tips once they are known);
- *  - parts not yet covered by a confirmed deposit are grouped under the
- *    payout day they belong to — the expected payouts;
- *  - a deposit record says a payout landed, for how much, and which parts it
- *    covered. Only then is income written, dated the day it landed.
+ *  - the Flex income recorded on a day is matched, in order, to the driven
+ *    days it pays for — the money for Monday arrives before Tuesday's does;
+ *  - whatever the income does not cover is still pending, shown under the
+ *    day it was driven with the day it will probably land, learned from how
+ *    long the earlier ones took;
+ *  - anything recorded beyond what the blocks add up to is called out, so a
+ *    day entered twice is visible rather than silently inflating the total.
  *
- * Tips that arrive after their block's payout was already confirmed roll
- * forward to the next payout, the way Amazon does it.
+ * A payout can also be recorded from here ("Landed"): that writes a deposit
+ * record plus the income entries, which then cover their parts directly.
  */
 
-/** Tuesday and Friday, as `Date.getDay()` counts. */
+/**
+ * Amazon's standard payout days, Tuesday and Friday, as `Date.getDay()`
+ * counts. Only a reference: the ledger learns the real lag from the records.
+ */
 export const PAYOUT_WEEKDAYS: readonly number[] = [2, 5];
 
 function fromIso(date: string): Date {
@@ -57,14 +62,17 @@ export function payoutDateFor(blockDate: string, latestDepositDate: string | nul
 }
 
 export interface ExpectedPayout {
+  /** The day the blocks were driven. */
   date: string;
+  /** When the money will probably show up, from how long earlier ones took. */
+  expectedOn: string;
   parts: FlexDepositPart[];
   base: number;
   tips: number;
   total: number;
   /** Distinct blocks with something in this payout. */
   blocks: number;
-  /** Days past the payout day, 0 when it is today or still ahead. */
+  /** Days past `expectedOn`, 0 when it is today or still ahead. */
   overdueDays: number;
   status: "upcoming" | "due";
 }
@@ -73,8 +81,10 @@ function partKey(part: Pick<FlexDepositPart, "entryId" | "part">): string {
   return `${part.part}:${part.entryId}`;
 }
 
-/** Every part of every block from `postFrom` on, whether covered or not. */
-export function blockParts(rule: Rule, entries: RuleEntry[], postFrom: string): FlexDepositPart[] {
+/** Every part of every block from `postFrom` on (`ALL_TIME` for all of them), covered or not. */
+export const ALL_TIME = "0000-01-01";
+
+export function blockParts(rule: Rule, entries: RuleEntry[], postFrom: string = ALL_TIME): FlexDepositPart[] {
   const parts: FlexDepositPart[] = [];
   for (const entry of entries) {
     if (entry.ruleId !== rule.id || entry.date < postFrom) continue;
@@ -103,42 +113,153 @@ export function coveredParts(deposits: FlexDeposit[], incomeEntries: IncomeEntry
   return covered;
 }
 
+/** One recorded day of Flex income and the driven days it paid for. */
+export interface RecordedMatch {
+  /** The day the money was recorded. */
+  date: string;
+  /** All Flex income recorded that day. */
+  amount: number;
+  /** Driven days this record paid for, oldest first. */
+  covers: Array<{ blockDate: string; total: number }>;
+  /** Recorded beyond what the covered days add up to — a day entered twice, usually. */
+  excess: number;
+  /** Recorded a little under the covered days — bank rounding or a tip adjustment. */
+  shortfall: number;
+}
+
+export interface FlexLedger {
+  /** Driven days whose money has not been recorded yet, oldest first. */
+  pending: ExpectedPayout[];
+  matches: RecordedMatch[];
+  /** Sum of every record's excess. */
+  excess: number;
+  /** Sum of every record's shortfall. */
+  shortfall: number;
+  /** Typical days from driving to the money being recorded. */
+  lagDays: number;
+  /** Whether `lagDays` was learned from this driver's records or is the default. */
+  lagLearned: boolean;
+}
+
+/** A day of driving counts as paid by a record that is within this much of it. */
+const MATCH_TOLERANCE = 1;
+/** Until enough records exist to learn from: Flex money usually shows up two days later. */
+const DEFAULT_LAG_DAYS = 2;
+
+function isAppWrittenFlexIncome(id: string): boolean {
+  return id.startsWith("flex-base-") || id.startsWith("flex-tip-") || id.startsWith("flex-dep-");
+}
+
+function addDays(dateIso: string, days: number): string {
+  const at = fromIso(dateIso);
+  return toIso(new Date(at.getFullYear(), at.getMonth(), at.getDate() + days));
+}
+
+function daysBetween(fromDate: string, toDate: string): number {
+  return Math.round((fromIso(toDate).getTime() - fromIso(fromDate).getTime()) / 86_400_000);
+}
+
+function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2;
+}
+
+/**
+ * Match recorded Flex income to driven days and list what is still pending.
+ *
+ * Records are walked oldest first; each one pays for the oldest unpaid driven
+ * days, in order, for as long as its amount lasts (within the tolerance). Money
+ * cannot pay for a day driven after it was recorded. What a record has left
+ * over is its excess; what it fell short by is its shortfall.
+ */
+export function matchRecordedIncome(
+  rule: Rule,
+  entries: RuleEntry[],
+  deposits: FlexDeposit[],
+  incomeEntries: IncomeEntry[],
+  incomeSources: IncomeSource[],
+  today: string
+): FlexLedger {
+  const covered = coveredParts(deposits, incomeEntries);
+
+  const byDay = new Map<string, FlexDepositPart[]>();
+  for (const part of blockParts(rule, entries)) {
+    if (covered.has(partKey(part))) continue;
+    byDay.set(part.blockDate, [...(byDay.get(part.blockDate) ?? []), part]);
+  }
+  const days = [...byDay.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, parts]) => ({ date, parts, total: roundMoney(parts.reduce((sum, p) => sum + p.amount, 0)) }));
+
+  const flexSources = new Set(incomeSources.filter(isFlexSource).map((source) => source.id));
+  const recordedByDay = new Map<string, number>();
+  for (const income of incomeEntries) {
+    if (!flexSources.has(income.sourceId) || isAppWrittenFlexIncome(income.id)) continue;
+    recordedByDay.set(income.date, roundMoney((recordedByDay.get(income.date) ?? 0) + income.amount));
+  }
+  const records = [...recordedByDay.entries()].sort(([a], [b]) => a.localeCompare(b));
+
+  const matches: RecordedMatch[] = [];
+  const lags: number[] = [];
+  let next = 0;
+  for (const [date, amount] of records) {
+    let remaining = amount;
+    const covers: RecordedMatch["covers"] = [];
+    while (next < days.length && days[next]!.date <= date && remaining >= days[next]!.total - MATCH_TOLERANCE) {
+      const day = days[next]!;
+      covers.push({ blockDate: day.date, total: day.total });
+      remaining = roundMoney(remaining - day.total);
+      next += 1;
+    }
+    const excess = remaining > MATCH_TOLERANCE ? remaining : 0;
+    const shortfall = remaining < 0 ? roundMoney(-remaining) : 0;
+    if (covers.length > 0) lags.push(daysBetween(covers[covers.length - 1]!.blockDate, date));
+    matches.push({ date, amount, covers, excess, shortfall });
+  }
+
+  const lagLearned = lags.length >= 2;
+  const lagDays = lagLearned ? Math.max(0, Math.round(median(lags))) : DEFAULT_LAG_DAYS;
+  const todayAt = fromIso(today).getTime();
+
+  const pending: ExpectedPayout[] = days.slice(next).map((day) => {
+    const base = roundMoney(day.parts.filter((p) => p.part === "base").reduce((sum, p) => sum + p.amount, 0));
+    const tips = roundMoney(day.parts.filter((p) => p.part === "tip").reduce((sum, p) => sum + p.amount, 0));
+    const expectedOn = addDays(day.date, lagDays);
+    const overdueDays = Math.max(0, Math.round((todayAt - fromIso(expectedOn).getTime()) / 86_400_000));
+    return {
+      date: day.date,
+      expectedOn,
+      parts: day.parts,
+      base,
+      tips,
+      total: day.total,
+      blocks: new Set(day.parts.map((p) => p.entryId)).size,
+      overdueDays,
+      status: expectedOn <= today ? "due" : "upcoming",
+    };
+  });
+
+  return {
+    pending,
+    matches,
+    excess: roundMoney(matches.reduce((sum, m) => sum + m.excess, 0)),
+    shortfall: roundMoney(matches.reduce((sum, m) => sum + m.shortfall, 0)),
+    lagDays,
+    lagLearned,
+  };
+}
+
+/** The pending days only — for callers that act on what is due. */
 export function expectedPayouts(
   rule: Rule,
   entries: RuleEntry[],
   deposits: FlexDeposit[],
   incomeEntries: IncomeEntry[],
-  postFrom: string,
+  incomeSources: IncomeSource[],
   today: string
 ): ExpectedPayout[] {
-  const covered = coveredParts(deposits, incomeEntries);
-  const latest = deposits.reduce<string | null>((max, d) => (max === null || d.date > max ? d.date : max), null);
-
-  const byDate = new Map<string, FlexDepositPart[]>();
-  for (const part of blockParts(rule, entries, postFrom)) {
-    if (covered.has(partKey(part))) continue;
-    const date = payoutDateFor(part.blockDate, latest);
-    byDate.set(date, [...(byDate.get(date) ?? []), part]);
-  }
-
-  const todayAt = fromIso(today).getTime();
-  return [...byDate.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, parts]) => {
-      const base = roundMoney(parts.filter((p) => p.part === "base").reduce((s, p) => s + p.amount, 0));
-      const tips = roundMoney(parts.filter((p) => p.part === "tip").reduce((s, p) => s + p.amount, 0));
-      const overdueDays = Math.max(0, Math.round((todayAt - fromIso(date).getTime()) / 86_400_000));
-      return {
-        date,
-        parts,
-        base,
-        tips,
-        total: roundMoney(base + tips),
-        blocks: new Set(parts.map((p) => p.entryId)).size,
-        overdueDays,
-        status: date <= today ? "due" : "upcoming",
-      };
-    });
+  return matchRecordedIncome(rule, entries, deposits, incomeEntries, incomeSources, today).pending;
 }
 
 /**

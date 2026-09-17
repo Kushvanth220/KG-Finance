@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 /**
  * The next seven days, on the home page.
  *
- * Bills come from Memory's bill list; reminders from Jarvis's. Both already
+ * Bills come from Memory's bill list; reminders from the assistant's. Both already
  * know their due dates — this just puts the ones about to land where they are
  * seen first, instead of two taps away.
  */

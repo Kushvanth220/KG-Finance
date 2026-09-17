@@ -11,7 +11,7 @@ import { PhoneMock } from "@/components/intro/phone-mock";
 import { CardStack } from "@/components/intro/card-stack";
 import { Tilt3D } from "@/components/art/tilt-3d";
 import { INTRO_SEEN_KEY } from "@/components/layout/first-visit-gate";
-import { DonutArt, FlexArt, JarvisOrb, NumbersFilm, SplitArt } from "@/components/intro/feature-art";
+import { AssistantOrb, DonutArt, FlexArt, NumbersFilm, SplitArt } from "@/components/intro/feature-art";
 
 /**
  * The front door.
@@ -61,12 +61,12 @@ const FEATURES: {
     art: <FlexArt />,
   },
   {
-    key: "jarvis",
-    kicker: "Jarvis",
+    key: "assistant",
+    kicker: "Assistant",
     tint: "#af52de",
     title: "Just tell it",
     body: "A voice assistant that knows the accounts, the bills and the rules. It asks before it writes anything down.",
-    art: <JarvisOrb />,
+    art: <AssistantOrb />,
   },
 ];
 

@@ -10,7 +10,7 @@ import { AssistantNameSetup } from "@/components/assistant/assistant-name-setup"
 import { useAssistant } from "@/components/assistant/assistant-context";
 import { formatWakeHint } from "@/lib/ai/assistant-wake";
 import { getVoiceGenderLabel } from "@/lib/ai/assistant-voice";
-import { useAssistantPreferencesStore } from "@/store/assistant-preferences-store";
+import { DEFAULT_ASSISTANT_NAME, useAssistantPreferencesStore } from "@/store/assistant-preferences-store";
 import { AiProviderTeam } from "@/components/assistant/ai-provider-team";
 import { cn } from "@/lib/utils";
 
@@ -38,7 +38,7 @@ export function AssistantPanel({ open, onVoiceLiveChange }: AssistantPanelProps)
     (state) => state.setWakeListeningEnabled
   );
 
-  const displayName = assistantName.trim() || "Jarvis";
+  const displayName = assistantName.trim() || DEFAULT_ASSISTANT_NAME;
   const needsNaming = !namingCompleted;
   const wakePhrase = formatWakeHint(displayName);
 

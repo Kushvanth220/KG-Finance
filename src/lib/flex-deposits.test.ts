@@ -4,6 +4,7 @@ import {
   depositIdFor,
   depositIncomeEntries,
   expectedPayouts,
+  matchRecordedIncome,
   nextPayoutDate,
   payoutDateFor,
   splitLanded,
@@ -46,54 +47,106 @@ describe("payout days", () => {
   });
 });
 
-describe("expectedPayouts", () => {
+const flexSources = [
+  { id: "src-flex", name: "Flex", person: "kushvanth" as const },
+  { id: "src-rent", name: "Rent", person: "kushvanth" as const },
+];
+
+function recorded(id: string, date: string, amount: number, sourceId = "src-flex") {
+  return { id, person: "kushvanth" as const, sourceId, amount, date, depositType: "debit" as const, depositAccountId: "x" };
+}
+
+describe("matchRecordedIncome", () => {
+  // Driven Mon 09/14 ($53), Tue 09/15 ($148), Wed 09/16 ($97): money for a
+  // day shows up two days later, and the driver records it then.
   const entries = [
-    block("a", "2026-09-12", 60, 8), // Sat → Tue 09/15
-    block("b", "2026-09-14", 72), // Mon, tips pending → Tue 09/15 (base only)
-    block("c", "2026-09-16", 66, 5), // Wed → Fri 09/18
+    block("a", "2026-09-14", 43, 10),
+    block("b", "2026-09-15", 33, 19),
+    block("c", "2026-09-15", 77, 19),
+    block("d", "2026-09-16", 63, 34),
   ];
+  const income = [recorded("i1", "2026-09-16", 53), recorded("i2", "2026-09-17", 148)];
 
-  it("groups uncovered parts by payout day with base and tips apart", () => {
-    const payouts = expectedPayouts(rule, entries, [], [], "2026-09-01", "2026-09-14");
-    expect(payouts.map((p) => p.date)).toEqual(["2026-09-15", "2026-09-18"]);
-    expect(payouts[0]).toMatchObject({ base: 132, tips: 8, total: 140, blocks: 2, status: "upcoming", overdueDays: 0 });
-    expect(payouts[1]).toMatchObject({ base: 66, tips: 5, total: 71, blocks: 1 });
+  it("pays for driven days in order and leaves the rest pending", () => {
+    const ledger = matchRecordedIncome(rule, entries, [], income, flexSources, "2026-09-17");
+    expect(ledger.matches.map((m) => [m.date, m.covers.map((c) => c.blockDate), m.excess, m.shortfall])).toEqual([
+      ["2026-09-16", ["2026-09-14"], 0, 0],
+      ["2026-09-17", ["2026-09-15"], 0, 0],
+    ]);
+    expect(ledger.pending.map((p) => [p.date, p.total, p.blocks])).toEqual([["2026-09-16", 97, 1]]);
+    expect(ledger.excess).toBe(0);
   });
 
-  it("marks a payout due once its day has come, and counts the days after", () => {
-    const payouts = expectedPayouts(rule, entries, [], [], "2026-09-01", "2026-09-17");
-    expect(payouts[0]).toMatchObject({ date: "2026-09-15", status: "due", overdueDays: 2 });
+  it("learns how long the money takes and dates the pending days by it", () => {
+    const ledger = matchRecordedIncome(rule, entries, [], income, flexSources, "2026-09-17");
+    expect(ledger.lagLearned).toBe(true);
+    expect(ledger.lagDays).toBe(2);
+    expect(ledger.pending[0]).toMatchObject({ expectedOn: "2026-09-18", status: "upcoming", overdueDays: 0 });
+    const later = matchRecordedIncome(rule, entries, [], income, flexSources, "2026-09-20");
+    expect(later.pending[0]).toMatchObject({ status: "due", overdueDays: 2 });
   });
 
-  it("leaves out what a deposit covered, and rolls late tips to the next payout", () => {
+  it("falls back to two days until there is enough history", () => {
+    const ledger = matchRecordedIncome(rule, entries, [], [], flexSources, "2026-09-14");
+    expect(ledger.lagLearned).toBe(false);
+    expect(ledger.pending[0]).toMatchObject({ date: "2026-09-14", expectedOn: "2026-09-16" });
+  });
+
+  it("calls out a day recorded twice instead of letting it pay for later days", () => {
+    // 09/14 recorded on 09/16 and again on 09/17 together with 09/15's money.
+    const twice = [recorded("i1", "2026-09-16", 53), recorded("i2", "2026-09-17", 201)];
+    const ledger = matchRecordedIncome(rule, entries, [], twice, flexSources, "2026-09-17");
+    expect(ledger.matches[1]).toMatchObject({ covers: [{ blockDate: "2026-09-15", total: 148 }], excess: 53 });
+    expect(ledger.excess).toBe(53);
+    expect(ledger.pending.map((p) => p.date)).toEqual(["2026-09-16"]);
+  });
+
+  it("tolerates a bank rounding difference and reports it as a shortfall", () => {
+    const ledger = matchRecordedIncome(rule, entries, [], [recorded("i1", "2026-09-16", 52.5)], flexSources, "2026-09-16");
+    expect(ledger.matches[0]).toMatchObject({ covers: [{ blockDate: "2026-09-14", total: 53 }], excess: 0, shortfall: 0.5 });
+  });
+
+  it("never lets money pay for a day driven after it was recorded", () => {
+    const early = [recorded("i1", "2026-09-13", 53)];
+    const ledger = matchRecordedIncome(rule, entries, [], early, flexSources, "2026-09-17");
+    expect(ledger.matches[0]).toMatchObject({ covers: [], excess: 53 });
+    expect(ledger.pending).toHaveLength(3);
+  });
+
+  it("ignores income from other sources and what the app wrote itself", () => {
+    const mixed = [
+      recorded("i1", "2026-09-16", 500, "src-rent"),
+      recorded("flex-base-a", "2026-09-14", 43),
+      recorded("flex-tip-a", "2026-09-14", 10),
+    ];
+    const ledger = matchRecordedIncome(rule, entries, [], mixed, flexSources, "2026-09-17");
+    expect(ledger.matches).toEqual([]);
+    // The per-block entries cover block "a" directly; nothing is double counted.
+    expect(ledger.pending.map((p) => p.date)).toEqual(["2026-09-15", "2026-09-16"]);
+  });
+
+  it("treats a confirmed deposit as covering its parts", () => {
     const deposit: FlexDeposit = {
-      id: "flexdep-2026-09-15",
-      date: "2026-09-15",
+      id: "flexdep-2026-09-16",
+      date: "2026-09-16",
       accountId: "bofa",
-      expected: 140,
-      actual: 140,
+      expected: 53,
+      actual: 53,
       parts: [
-        { entryId: "a", part: "base", amount: 60, blockDate: "2026-09-12" },
-        { entryId: "a", part: "tip", amount: 8, blockDate: "2026-09-12" },
-        { entryId: "b", part: "base", amount: 72, blockDate: "2026-09-14" },
+        { entryId: "a", part: "base", amount: 43, blockDate: "2026-09-14" },
+        { entryId: "a", part: "tip", amount: 10, blockDate: "2026-09-14" },
       ],
-      createdAt: "2026-09-15T14:00:00.000Z",
+      createdAt: "2026-09-16T14:00:00.000Z",
     };
-    const later = [entries[0]!, block("b", "2026-09-14", 72, 11), entries[2]!];
-    const payouts = expectedPayouts(rule, later, [deposit], [], "2026-09-01", "2026-09-16");
-    expect(payouts).toHaveLength(1);
-    expect(payouts[0]).toMatchObject({ date: "2026-09-18", base: 66, tips: 16, blocks: 2 });
+    const ledger = matchRecordedIncome(rule, entries, [deposit], [], flexSources, "2026-09-17");
+    expect(ledger.pending.map((p) => p.date)).toEqual(["2026-09-15", "2026-09-16"]);
   });
 
-  it("treats the old per-block income entries as already deposited", () => {
-    const legacy = [{ id: "flex-base-a", person: "kushvanth", sourceId: "s", amount: 60, date: "2026-09-12", depositType: "debit", depositAccountId: "x" }] as never;
-    const payouts = expectedPayouts(rule, entries, [], legacy, "2026-09-01", "2026-09-14");
-    expect(payouts[0]).toMatchObject({ base: 72, tips: 8 });
-  });
-
-  it("ignores blocks before the tracking start", () => {
-    const payouts = expectedPayouts(rule, entries, [], [], "2026-09-15", "2026-09-14");
-    expect(payouts.map((p) => p.date)).toEqual(["2026-09-18"]);
+  it("rolls tips that arrive late into the block's own day", () => {
+    const withoutTips = [block("a", "2026-09-14", 43)];
+    expect(expectedPayouts(rule, withoutTips, [], [], flexSources, "2026-09-14")[0]).toMatchObject({ base: 43, tips: 0, total: 43 });
+    const withTips = [block("a", "2026-09-14", 43, 10)];
+    expect(expectedPayouts(rule, withTips, [], [], flexSources, "2026-09-14")[0]).toMatchObject({ base: 43, tips: 10, total: 53 });
   });
 });
 

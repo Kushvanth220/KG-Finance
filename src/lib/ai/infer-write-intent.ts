@@ -324,7 +324,7 @@ function inferExpense(text: string, speaker?: Person | null): AssistantToolCall 
       ...(people.expense_for ? { expense_for: people.expense_for } : {}),
       ...(people.paid_by ? { paid_by: people.paid_by } : {}),
       // No raw transcript here: `text` is a joined window of recent speech and
-      // was landing whole conversations (including Jarvis's own lines) in the
+      // was landing whole conversations (including the assistant's own lines) in the
       // saved note. The app writes its own description from the fields above.
     },
   };

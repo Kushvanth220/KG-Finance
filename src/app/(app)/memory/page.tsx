@@ -19,7 +19,7 @@ import {
 } from "@/components/memory/memory-section";
 import { BillEditor, type BillDraft } from "@/components/memory/bill-editor";
 import { ReminderEditor } from "@/components/memory/reminder-editor";
-import { useAssistantPreferencesStore } from "@/store/assistant-preferences-store";
+import { useAssistantName, useAssistantPreferencesStore } from "@/store/assistant-preferences-store";
 import { describeSchedule, dueLabel, isDueSoon, type Reminder } from "@/lib/ai/reminders";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useFinanceStore } from "@/store/finance-store";
@@ -32,7 +32,7 @@ import { CalendarDays, List } from "lucide-react";
 import { PERSON_LABELS, type MonthlyExpense } from "@/types";
 
 /**
- * The app's memory: everything Jarvis knows, by category, all editable here.
+ * The app's memory: everything the assistant knows, by category, all editable here.
  *
  * Two different stores feed this page. Reminders and behaviour rules live with
  * the assistant (Supabase, via /api/ai/preferences); bills, sources, categories
@@ -48,6 +48,7 @@ const ordinal = (n: number) => {
 };
 
 export default function MemoryPage() {
+  const assistantName = useAssistantName();
   const {
     monthlyExpenses,
     addMonthlyExpense,
@@ -66,7 +67,7 @@ export default function MemoryPage() {
   } = useFinanceStore();
 
   // Reminders and behaviour rules come from the SAME store the assistant reads,
-  // not a private fetch — otherwise this page and Jarvis drift apart. The store
+  // not a private fetch — otherwise this page and the assistant drift apart. The store
   // pushes every change to Supabase itself.
   const {
     structuredReminders,
@@ -146,7 +147,7 @@ export default function MemoryPage() {
             Memory
           </h1>
           <p className="text-xs text-muted mt-0.5">
-            Everything Jarvis remembers about your finances. Edit anything here.
+            Everything {assistantName} remembers about your finances. Edit anything here.
           </p>
         </div>
         <div className="glass flex shrink-0 gap-0.5 rounded-lg p-0.5">
@@ -205,7 +206,7 @@ export default function MemoryPage() {
         title="Reminders"
         hint={
           structuredReminders.length === 0
-            ? "What Jarvis brings up when you check in"
+            ? `What ${assistantName} brings up when you check in`
             : `${pendingCount} open · ${dueSoonCount} due now`
         }
         count={pendingCount}
@@ -216,7 +217,7 @@ export default function MemoryPage() {
       >
         {orderedReminders.length === 0 ? (
           <MemoryEmpty>
-            Nothing yet. Say &ldquo;remind me…&rdquo; to Jarvis, or add one here.
+            Nothing yet. Say &ldquo;remind me…&rdquo; to {assistantName}, or add one here.
           </MemoryEmpty>
         ) : (
           orderedReminders.map((reminder) => {
@@ -302,7 +303,7 @@ export default function MemoryPage() {
 
       {/* ---- behaviour ---- */}
       <MemorySection
-        title="How Jarvis behaves"
+        title={`How ${assistantName} behaves`}
         hint="Rules it follows in every conversation"
         count={behaviorInstructions.length}
         tint="#af52de"
@@ -348,7 +349,7 @@ export default function MemoryPage() {
       {/* ---- bills ---- */}
       <MemorySection
         title="Bills"
-        hint="Recurring costs Jarvis can remind you about"
+        hint={`Recurring costs ${assistantName} can remind you about`}
         count={monthlyExpenses.length}
         tint="#ff3b30"
         icon={<ReceiptText className="w-3.5 h-3.5" />}

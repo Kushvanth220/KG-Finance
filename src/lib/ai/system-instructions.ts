@@ -1,3 +1,4 @@
+import { DEFAULT_ASSISTANT_NAME } from "@/lib/ai/assistant-name";
 import { buildAssistantKnowledgeBlock } from "@/lib/ai/assistant-knowledge";
 import { ASSISTANT_LANGUAGE } from "@/lib/ai/live-config";
 import { ENGLISH_ONLY_REPLY } from "@/lib/ai/live-transcript";
@@ -26,7 +27,7 @@ export function buildSystemInstruction(
   financeContext: string,
   options: BuildInstructionOptions = {}
 ): string {
-  const aiName = options.assistantName?.trim() || "Jarvis";
+  const aiName = options.assistantName?.trim() || DEFAULT_ASSISTANT_NAME;
 
   // The model used to guess the date and got it wrong — one session insisted
   // it was the 3rd while another said the 2nd, and "yesterday" was logged as

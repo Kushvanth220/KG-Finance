@@ -14,7 +14,7 @@ import { dueLabel, isDueSoon, reminderFromLegacyLine, type Reminder } from "@/li
 import { getDueDateForExpense, getMonthlyExpensePaid } from "@/lib/monthly-expense-tracker";
 import { zonedToday } from "@/lib/zoned-date";
 import { formatCurrency } from "@/lib/formatters";
-import type { FlexDeposit, IncomeEntry, MonthlyExpense, Transaction } from "@/types";
+import type { FlexDeposit, IncomeEntry, IncomeSource, MonthlyExpense, Transaction } from "@/types";
 
 export const dynamic = "force-dynamic";
 
@@ -76,6 +76,7 @@ function flexNudges(
   entries: RuleEntry[],
   deposits: FlexDeposit[],
   incomeEntries: IncomeEntry[],
+  incomeSources: IncomeSource[],
   todayIso: string,
   now: Date
 ): Due[] {
@@ -94,18 +95,21 @@ function flexNudges(
     });
   }
 
-  if (rule.payout.accountId && rule.payout.postFrom) {
-    const landing = expectedPayouts(rule, entries, deposits, incomeEntries, rule.payout.postFrom, todayIso).find(
-      (payout) => payout.date === todayIso
-    );
-    if (landing) {
-      out.push({
-        text: rule.payout.autoPost
-          ? `Flex payout ${formatCurrency(landing.total)} written today — check it matches the bank`
-          : `Flex should pay ${formatCurrency(landing.total)} today — tap Landed when it shows`,
-        person: "kushvanth",
-      });
-    }
+  // Money that should be showing up today, and money that is late.
+  const landing = expectedPayouts(rule, entries, deposits, incomeEntries, incomeSources, todayIso).filter(
+    (payout) => payout.status === "due"
+  );
+  const total = landing.reduce((sum, payout) => sum + payout.total, 0);
+  if (landing.length > 0) {
+    const late = landing.filter((payout) => payout.overdueDays > 0).length;
+    out.push({
+      text: rule.payout.autoPost
+        ? `Flex payout ${formatCurrency(total)} written today — check it matches the bank`
+        : late > 0
+          ? `Flex money not recorded yet: ${formatCurrency(total)} from ${landing.length} ${landing.length === 1 ? "day" : "days"} — record it when it shows`
+          : `Flex should pay ${formatCurrency(total)} today — record it when it shows`,
+      person: "kushvanth",
+    });
   }
   return out;
 }
@@ -137,6 +141,7 @@ export async function GET(request: Request) {
         monthlyExpenses?: MonthlyExpense[];
         transactions?: Transaction[];
         incomeEntries?: IncomeEntry[];
+        incomeSources?: IncomeSource[];
         flexDeposits?: FlexDeposit[];
       } | null>,
       listPushSubscriptions(),
@@ -152,6 +157,7 @@ export async function GET(request: Request) {
         (rulesData?.entries ?? []) as RuleEntry[],
         finance?.flexDeposits ?? [],
         finance?.incomeEntries ?? [],
+        finance?.incomeSources ?? [],
         iso,
         new Date()
       ),

@@ -2307,7 +2307,7 @@ input[type="number"] {
   }
 }
 
-/* ---- live voice pipeline (You -> Gemini -> Tools -> Jarvis) ---- */
+/* ---- live voice pipeline (You -> Gemini -> Tools -> Reply) ---- */
 .vp {
   display: flex;
   flex-direction: column;

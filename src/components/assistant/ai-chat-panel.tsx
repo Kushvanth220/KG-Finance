@@ -8,7 +8,7 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { CompactPageShell } from "@/components/ui/compact-page-shell";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { getClientFinancePayload } from "@/lib/ai/client-finance-context";
-import { getBehaviorInstructionsForAssistant, getRemindersForAssistant } from "@/store/assistant-preferences-store";
+import { DEFAULT_ASSISTANT_NAME, getBehaviorInstructionsForAssistant, getRemindersForAssistant } from "@/store/assistant-preferences-store";
 import { getRulesForAssistant } from "@/store/rules-store";
 import { describeRule } from "@/lib/rules/engine";
 import { AssistantMessageBody } from "@/components/assistant/assistant-message-body";
@@ -108,7 +108,7 @@ function allCategoryChips() {
 }
 
 export function AiChatPanel({
-  assistantName = "Jarvis",
+  assistantName = DEFAULT_ASSISTANT_NAME,
   embedded = false,
 }: AiChatPanelProps) {
   const person: Person = "kushvanth";
@@ -920,7 +920,7 @@ export function AiChatPanel({
           <p className="text-xs text-[#ff3b30]">{error}</p>
           {/failed|provider|unavailable|not configured|timed out|network/i.test(error) ? (
             <p className="mt-1 text-[11px] text-muted">
-              The forms still work without Jarvis:{" "}
+              The forms still work without {assistantName}:{" "}
               <Link href="/spend" className="font-semibold text-[#007aff]">Spend</Link> ·{" "}
               <Link href="/flex" className="font-semibold text-[#007aff]">Flex block</Link> ·{" "}
               <Link href="/accounts" className="font-semibold text-[#007aff]">Income</Link> ·{" "}

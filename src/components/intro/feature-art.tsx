@@ -292,10 +292,10 @@ export function FlexArt() {
 }
 
 /* ------------------------------------------------------------------ */
-/* Jarvis — the listening orb                                          */
+/* Assistant — the listening orb                                          */
 /* ------------------------------------------------------------------ */
 
-export function JarvisOrb() {
+export function AssistantOrb() {
   return (
     <div className="relative flex h-full w-full items-center justify-center">
       <span className="intro-orb-ring" style={{ animationDelay: "0s" }} />

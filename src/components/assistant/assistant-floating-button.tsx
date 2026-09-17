@@ -11,6 +11,7 @@ import { ensureAudioUnlocked } from "@/lib/ai/audio-utils";
 import { formatWakeHint } from "@/lib/ai/assistant-wake";
 import {
   buildWakeNameEntries,
+  DEFAULT_ASSISTANT_NAME,
   useAssistantPreferencesStore,
 } from "@/store/assistant-preferences-store";
 import { cn } from "@/lib/utils";
@@ -22,7 +23,7 @@ export function AssistantFloatingButton() {
   const wakeEnabled = useAssistantPreferencesStore((state) => state.wakeListeningEnabled);
   const [voiceLive, setVoiceLive] = useState(false);
 
-  const displayName = assistantName.trim() || "Jarvis";
+  const displayName = assistantName.trim() || DEFAULT_ASSISTANT_NAME;
   const wakeEntries = useMemo(
     () => (namingCompleted ? buildWakeNameEntries() : []),
     [namingCompleted]
