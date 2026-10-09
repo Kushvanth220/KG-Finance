@@ -6,6 +6,7 @@ import { ChevronRight, CreditCard, HandCoins } from "lucide-react";
 import { AnimatedMoney } from "@/components/ui/animated-number";
 import { useFinanceStore } from "@/store/finance-store";
 import { getPersonDebtOutstandingSummary } from "@/lib/calculations";
+import { getAccountsForPerson } from "@/lib/accounts";
 import { roundMoney } from "@/lib/money";
 import { upcomingFor, whenLabel } from "@/lib/upcoming";
 import { formatCurrency } from "@/lib/formatters";
@@ -46,21 +47,32 @@ export function DebtsSummary({ person }: { person: Person }) {
 
   const view = useMemo(() => {
     const summary = getPersonDebtOutstandingSummary(debts, person);
-    const cards = summary.activeDebts.filter((debt) => !!debt.linkedAccountId);
     const own = summary.activeDebts.filter((debt) => !debt.linkedAccountId);
+
+    // What is owed on cards comes from the CARDS, not from debt rows. A card
+    // with no matching debt row still has to be paid, and leaving it out is
+    // how this figure came to disagree with "Owed on cards" above it by the
+    // whole balance of one card.
+    const creditAccounts = getAccountsForPerson(accounts, person).filter(
+      (account) => account.type === "credit" && account.balance > 0
+    );
+    const cardDebts = summary.activeDebts.filter((debt) => !!debt.linkedAccountId);
     const accountNames = new Map(accounts.map((a) => [a.id, a.name]));
     const due = upcomingFor(monthlyExpenses, transactions, [], person, 45);
     return {
-      any: summary.activeDebts.length > 0 || summary.clearedDebts.length > 0,
+      any:
+        summary.activeDebts.length > 0 ||
+        summary.clearedDebts.length > 0 ||
+        creditAccounts.length > 0,
       own: {
         total: roundMoney(own.reduce((sum, d) => sum + d.amount, 0)),
         count: own.length,
         next: nextPaymentFor(own, accountNames, due),
       },
       cards: {
-        total: roundMoney(cards.reduce((sum, d) => sum + d.amount, 0)),
-        count: cards.length,
-        next: nextPaymentFor(cards, accountNames, due),
+        total: roundMoney(creditAccounts.reduce((sum, account) => sum + account.balance, 0)),
+        count: creditAccounts.length,
+        next: nextPaymentFor(cardDebts, accountNames, due),
       },
     };
   }, [debts, accounts, monthlyExpenses, transactions, person]);
@@ -71,7 +83,7 @@ export function DebtsSummary({ person }: { person: Person }) {
     {
       key: "own",
       icon: HandCoins,
-      tint: "#ff9500",
+      tint: "var(--warning)",
       label: "Own debts",
       hint: "loans & IOUs",
       ...view.own,
@@ -79,7 +91,7 @@ export function DebtsSummary({ person }: { person: Person }) {
     {
       key: "cards",
       icon: CreditCard,
-      tint: "#ff3b30",
+      tint: "var(--danger)",
       label: "Credit card debts",
       hint: "card bills",
       ...view.cards,
@@ -90,7 +102,7 @@ export function DebtsSummary({ person }: { person: Person }) {
     <div className="glass rounded-xl px-3 py-2.5">
       <div className="mb-1.5 flex items-center justify-between">
         <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Debts owed</p>
-        <Link href="/debts" className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-[#007aff]">
+        <Link href="/debts" className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-accent">
           Manage <ChevronRight className="h-3 w-3" />
         </Link>
       </div>

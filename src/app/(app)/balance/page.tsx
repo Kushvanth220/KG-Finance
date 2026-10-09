@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { ChevronRight, Info, Plus } from "lucide-react";
 import { CompactPageShell } from "@/components/ui/compact-page-shell";
-import { BetweenArt } from "@/components/art/page-art";
+import { BalanceSeesaw } from "@/components/art/balance-seesaw";
 import { BalanceTimeline } from "@/components/balance/balance-timeline";
 import { PaidDonut } from "@/components/balance/paid-donut";
 import { GlassButton } from "@/components/ui/glass-button";
@@ -43,9 +43,9 @@ const FILTERS: { id: Filter; label: string }[] = [
 ];
 
 const KIND_TINT: Record<EntryKind, string> = {
-  spend: "#007aff",
-  outside: "#ff9500",
-  other: "#8e8e93",
+  spend: "var(--accent)",
+  outside: "var(--warning)",
+  other: "var(--neutral)",
 };
 
 interface Shown {
@@ -182,18 +182,17 @@ export default function BetweenPage() {
       className="max-w-lg"
     >
       <GlassCard strong className="!py-4 text-center space-y-1">
-        {/* The arrow flies from whoever owes to whoever is owed, so the picture
-            and the sentence under it can never disagree. */}
-        <div className="mx-auto mb-1 h-24 max-w-[280px]">
-          <BetweenArt
+        {/* The see-saw tips toward whoever is owed, with their coins on their
+            side, so the picture and the sentence under it can never disagree. */}
+        <div className="mx-auto mb-1 h-30 max-w-[280px]">
+          <BalanceSeesaw
             balance={settlementBalance}
-            showAmount={false}
             picked={filterPerson}
             onPick={(person) => setFilterPerson((current) => (current === person ? null : person))}
           />
         </div>
         <p className="text-xs text-muted">{balanceSummary.label}</p>
-        <p className="text-3xl font-bold tracking-tight text-[#007aff] kg-figure">
+        <p className="text-3xl font-bold tracking-tight text-accent kg-figure">
           <AnimatedMoney value={balanceSummary.amount} />
         </p>
         <p className="text-[11px] text-muted tabular-nums">{storyLine}</p>
@@ -210,9 +209,9 @@ export default function BetweenPage() {
           <div className="min-w-0 flex-1">
             <p className="text-xs font-semibold">{monthName}</p>
             <p className="text-[11px] leading-snug text-muted tabular-nums">
-              <span className="font-semibold text-[#007aff]">{PERSON_LABELS.kushvanth}</span> paid{" "}
+              <span className="font-semibold text-accent">{PERSON_LABELS.kushvanth}</span> paid{" "}
               {formatCurrency(paidThisMonth.kushvanth)} for {PERSON_LABELS.g} ·{" "}
-              <span className="font-semibold text-[#af52de]">{PERSON_LABELS.g}</span> paid{" "}
+              <span className="font-semibold text-feature">{PERSON_LABELS.g}</span> paid{" "}
               {formatCurrency(paidThisMonth.g)} for {PERSON_LABELS.kushvanth}
             </p>
           </div>
@@ -228,7 +227,7 @@ export default function BetweenPage() {
                 onClick={() => setFilter(item.id)}
                 className={cn(
                   "hit shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors",
-                  active ? "bg-[#007aff] text-white" : "glass text-muted"
+                  active ? "glass-pill" : "glass text-muted"
                 )}
                 aria-pressed={active}
               >
@@ -282,7 +281,7 @@ export default function BetweenPage() {
                         }}
                         className={cn(
                           "flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition-colors",
-                          isClickable && "hover:bg-[#007aff]/5 cursor-pointer"
+                          isClickable && "hover:bg-accent/5 cursor-pointer"
                         )}
                       >
                         <span
@@ -304,7 +303,7 @@ export default function BetweenPage() {
                         <span
                           className={cn(
                             "shrink-0 text-sm font-semibold tabular-nums",
-                            entry.paidBy === "kushvanth" ? "text-[#007aff]" : "text-[#af52de]"
+                            entry.paidBy === "kushvanth" ? "text-accent" : "text-feature"
                           )}
                         >
                           {formatCurrency(entry.amount)}
@@ -325,12 +324,12 @@ export default function BetweenPage() {
           <p>
             <strong>Spend page</strong> — paying from a bank account for the other person, or for both of
             you, updates the balance and History automatically. Those rows show a{" "}
-            <span className="inline-block h-2 w-2 rounded-full bg-[#007aff] align-middle" /> blue dot.
+            <span className="inline-block h-2 w-2 rounded-full bg-accent align-middle" /> blue dot.
           </p>
           <p>
             <strong>Add button</strong> — for cash or money from outside your accounts (e.g.{" "}
             {PERSON_LABELS.g} gave you $1,000 from another source). It needs a note and shows
-            in History with an <span className="inline-block h-2 w-2 rounded-full bg-[#ff9500] align-middle" />{" "}
+            in History with an <span className="inline-block h-2 w-2 rounded-full bg-caution align-middle" />{" "}
             orange dot. It does not change any account balance.
           </p>
           <p className="text-muted">
@@ -364,7 +363,7 @@ export default function BetweenPage() {
                   }}
                   className={cn(
                     "flex-1 py-2 rounded-lg text-xs font-medium transition-all",
-                    paidBy === person ? "bg-[#007aff] text-white" : "text-muted"
+                    paidBy === person ? "glass-pill" : "text-muted"
                   )}
                 >
                   {PERSON_LABELS[person]}
@@ -391,7 +390,7 @@ export default function BetweenPage() {
               <button
                 type="button"
                 onClick={() => setAmount(String(Math.abs(settlementBalance)))}
-                className="hit mt-1.5 rounded-full glass px-2.5 py-1 text-[11px] font-semibold text-[#007aff]"
+                className="hit mt-1.5 rounded-full glass px-2.5 py-1 text-[11px] font-semibold text-accent"
               >
                 Full balance · {formatCurrency(Math.abs(settlementBalance))}
               </button>
@@ -411,8 +410,8 @@ export default function BetweenPage() {
           </div>
 
           {previewMessage && (
-            <div className="rounded-xl bg-[#34c759]/10 border border-[#34c759]/20 px-3 py-2 text-xs">
-              <p className="font-semibold text-[#34c759] mb-0.5">Preview</p>
+            <div className="rounded-xl bg-positive/10 border border-positive/20 px-3 py-2 text-xs">
+              <p className="font-semibold text-positive mb-0.5">Preview</p>
               <p>{previewMessage}</p>
               {notes.trim() && <p className="text-muted mt-1">Note: {notes.trim()}</p>}
               <p className="text-[10px] text-muted mt-1.5">

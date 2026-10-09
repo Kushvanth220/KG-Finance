@@ -18,7 +18,7 @@ export function GlassInput({ label, className, id, ...props }: GlassInputProps) 
         id={inputId}
         className={cn(
           "glass rounded-2xl px-4 py-3 text-foreground placeholder:text-muted",
-          "outline-none focus:ring-2 focus:ring-[#007aff]/40 transition-all duration-200",
+          "outline-none focus:ring-2 focus:ring-accent/40 transition-all duration-200",
           className
         )}
         {...props}

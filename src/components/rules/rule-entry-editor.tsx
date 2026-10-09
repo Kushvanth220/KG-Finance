@@ -166,7 +166,7 @@ export function RuleEntryEditor({
               type="date"
               value={date}
               onChange={(event) => setDate(event.target.value)}
-              className="mt-1 w-full glass rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#007aff]/40"
+              className="mt-1 w-full glass-field rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent/40"
             />
             {stackable ? (
               <p className="mt-1 text-[10px] text-muted">Everything below is logged on this day.</p>
@@ -181,7 +181,7 @@ export function RuleEntryEditor({
                 key={preset.label}
                 type="button"
                 onClick={() => applyPreset(preset)}
-                className="hit rounded-full glass px-2.5 py-1 text-[11px] font-semibold text-[#007aff] hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
+                className="hit rounded-full glass px-2.5 py-1 text-[11px] font-semibold text-accent hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
               >
                 {preset.label}
               </button>
@@ -209,7 +209,7 @@ export function RuleEntryEditor({
                       type="button"
                       onClick={() => removeRow(row.id)}
                       aria-label={`Remove number ${index + 1}`}
-                      className="hit rounded-lg p-1 text-muted hover:bg-black/5 hover:text-[#ff3b30] dark:hover:bg-white/10"
+                      className="hit rounded-lg p-1 text-muted hover:bg-black/5 hover:text-negative dark:hover:bg-white/10"
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
@@ -227,7 +227,7 @@ export function RuleEntryEditor({
                         <button
                           type="button"
                           onClick={() => setField(row.id, item.key, zonedClockNow())}
-                          className="hit rounded-md px-1.5 py-0.5 text-[10px] font-semibold text-[#007aff] hover:bg-black/5 dark:hover:bg-white/10"
+                          className="hit rounded-md px-1.5 py-0.5 text-[10px] font-semibold text-accent hover:bg-black/5 dark:hover:bg-white/10"
                         >
                           Now
                         </button>
@@ -241,7 +241,7 @@ export function RuleEntryEditor({
                       placeholder={item.type === "money" ? "0.00" : item.label}
                       // The cursor lands on the first blank, so prefilled times are skipped.
                       autoFocus={index === 0 && item === (asked.find((f) => !rows[0]?.values[f.key]) ?? asked[0])}
-                      className="mt-1 w-full glass rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#007aff]/40"
+                      className="mt-1 w-full glass-field rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent/40"
                     />
                   </div>
                 ))}
@@ -250,7 +250,7 @@ export function RuleEntryEditor({
               {rule.calculations.length > 0 ? (
                 <div
                   className={cn(
-                    "mt-2 rounded-xl border border-[#007aff]/25 bg-[#007aff]/[0.07] px-3 py-2",
+                    "mt-2 rounded-xl border border-accent/25 bg-accent/[0.07] px-3 py-2",
                     stackable && !started(row) && "opacity-40"
                   )}
                 >
@@ -280,7 +280,7 @@ export function RuleEntryEditor({
             <button
               type="button"
               onClick={addRow}
-              className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-black/15 py-2.5 text-[12px] font-semibold text-[#007aff] hover:bg-black/[0.03] dark:border-white/20 dark:hover:bg-white/[0.04]"
+              className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-black/15 py-2.5 text-[12px] font-semibold text-accent hover:bg-black/[0.03] dark:border-white/20 dark:hover:bg-white/[0.04]"
             >
               <Plus className="h-3.5 w-3.5" /> Add another
             </button>

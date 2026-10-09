@@ -1,11 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { Brain, Check, Smartphone } from "lucide-react";
-import { OWNER_LABEL, MEMBER_LABEL } from "@/lib/branding";
-import type { Person } from "@/types";
-import { formatCurrency } from "@/lib/formatters";
+import { formatCurrency, formatDate } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 
 /**
@@ -49,9 +47,75 @@ export function Rings3D({ size = 40, className }: { size?: number; className?: s
       aria-hidden="true"
     >
       <span className="kg-rings3d-spin absolute inset-0" style={{ transformStyle: "preserve-3d" }}>
-        {ring("conic-gradient(from 200deg, #0A84FF, #5E5CE6, #0A84FF)", `translateX(${-size * 0.16}px) translateZ(0)`)}
-        {ring("conic-gradient(from 20deg, #7F5AF0, #C74FE6, #7F5AF0)", `translateX(${size * 0.16}px) rotateY(72deg)`)}
+        {ring("conic-gradient(from 200deg, #6cc6ff, #3781fc, #6cc6ff)", `translateX(${-size * 0.16}px) translateZ(0)`)}
+        {ring("conic-gradient(from 20deg, #a78bfa, #b49cff, #a78bfa)", `translateX(${size * 0.16}px) rotateY(72deg)`)}
       </span>
+    </span>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* The last sixteen days, as a grid                                     */
+/* ------------------------------------------------------------------ */
+
+/** Days in the window. Four rows of four reads as a block at any size. */
+const GRID_DAYS = 16;
+
+/**
+ * Recent spending, drawn as a calendar heatmap the size of a favicon.
+ *
+ * Each cell is a day, oldest first, lit against the heaviest day in the
+ * window. At 36px no figure is readable and none is meant to be — what you
+ * get is the shape of the fortnight, which is the thing you actually notice
+ * from across the room: a quiet week, a bad weekend, one day that ate the
+ * month.
+ *
+ * Five steps, not a smooth ramp. Continuous opacity at this size turns into
+ * mush; discrete steps stay separable. An empty day keeps a faint tile rather
+ * than vanishing, so the grid is always a grid and a gap always means zero.
+ */
+export function SpendGrid({
+  days,
+  size = 36,
+  className,
+}: {
+  /** Oldest first. Amounts are this person's share, already summed per day. */
+  days: { date: string; amount: number }[];
+  size?: number;
+  className?: string;
+}) {
+  const recent = days.slice(-GRID_DAYS);
+  const peak = recent.reduce((max, day) => Math.max(max, day.amount), 0);
+  const busiest = recent.reduce(
+    (worst, day) => (day.amount > worst.amount ? day : worst),
+    { date: "", amount: 0 }
+  );
+
+  const label =
+    peak > 0
+      ? `Spending over the last ${recent.length} days. Busiest ${formatDate(busiest.date)}, ${formatCurrency(busiest.amount)}.`
+      : `Nothing spent in the last ${recent.length} days.`;
+
+  return (
+    <span
+      className={cn("kg-grid", className)}
+      style={{ width: size, height: size }}
+      role="img"
+      aria-label={label}
+    >
+      {recent.map((day, index) => {
+        // Five steps: empty, then four levels of the worst day.
+        const share = peak > 0 ? day.amount / peak : 0;
+        const step = day.amount <= 0 ? 0 : Math.min(4, Math.ceil(share * 4));
+        const opacity = [0.12, 0.34, 0.56, 0.78, 1][step];
+        return (
+          <span
+            key={day.date}
+            className="kg-grid-cell"
+            style={{ opacity, animationDelay: `${index * 0.016}s` }}
+          />
+        );
+      })}
     </span>
   );
 }
@@ -63,7 +127,7 @@ export function Rings3D({ size = 40, className }: { size?: number; className?: s
 export function ArcGauge({
   value,
   max,
-  color = "#007aff",
+  color = "var(--accent)",
   track = "rgba(127,127,127,0.18)",
   size = 64,
   label,
@@ -100,146 +164,6 @@ export function ArcGauge({
           {label}
         </text>
       ) : null}
-    </svg>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Balance — the arrow points the way the money owes                */
-/* ------------------------------------------------------------------ */
-
-/**
- * `balance` follows the store's sign: positive means the second member owes the
- * owner, negative the other way. The arrow always flies from the one who
- * owes toward the one who is owed, so the picture agrees with the sentence.
- */
-export function BetweenArt({
-  balance,
-  showAmount = true,
-  picked = null,
-  onPick,
-  className,
-}: {
-  balance: number;
-  /** Off when the page already prints the figure large beneath the picture. */
-  showAmount?: boolean;
-  /** Which person is highlighted, when the avatars act as a filter. */
-  picked?: Person | null;
-  onPick?: (person: Person) => void;
-  className?: string;
-}) {
-  const still = useReducedMotion();
-  const even = Math.abs(balance) < 0.005;
-  const memberOwes = balance > 0;
-  const amount = Math.abs(balance);
-
-  // The arrow redraws only when the balance actually moves, so motion means
-  // something happened. On first paint it is simply there.
-  const [seenBalance, setSeenBalance] = useState(balance);
-  const [pulse, setPulse] = useState(0);
-  if (seenBalance !== balance) {
-    setSeenBalance(balance);
-    setPulse((count) => count + 1);
-  }
-  const animateArrow = pulse > 0 && !still;
-
-  const owner = { x: 60, initial: OWNER_LABEL.charAt(0) };
-  const member = { x: 260, initial: MEMBER_LABEL.charAt(0) };
-  const from = memberOwes ? member : owner;
-  const to = memberOwes ? owner : member;
-  const dir = to.x > from.x ? 1 : -1;
-  const x1 = from.x + dir * 42;
-  const x2 = to.x - dir * 42;
-
-  return (
-    <svg viewBox="0 0 320 128" className={cn("h-full w-full", className)} role="img"
-      aria-label={even ? "All even" : `${formatCurrency(amount)} owed`}>
-      <defs>
-        <linearGradient id="baK" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#0A84FF" /><stop offset="1" stopColor="#5E5CE6" />
-        </linearGradient>
-        <linearGradient id="baG" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#7F5AF0" /><stop offset="1" stopColor="#C74FE6" />
-        </linearGradient>
-      </defs>
-
-      {/* the two people; when even, the rings lean in and touch. Tappable when
-          the page wants them as a filter, with a ring on whoever is picked. */}
-      <motion.g
-        animate={{ x: even ? 62 : 0 }}
-        transition={{ duration: 0.8, ease: EASE }}
-        onClick={onPick ? () => onPick("kushvanth") : undefined}
-        style={{ cursor: onPick ? "pointer" : undefined }}
-        role={onPick ? "button" : undefined}
-        aria-label={onPick ? `Show what ${OWNER_LABEL} paid` : undefined}
-      >
-        {picked === "kushvanth" ? <circle cx={owner.x} cy="64" r="37" fill="none" stroke="var(--accent-cyan)" strokeWidth="3" /> : null}
-        <circle cx={owner.x} cy="64" r="32" fill="url(#baK)" opacity={picked && picked !== "kushvanth" ? 0.45 : 1} />
-        <text x={owner.x} y="72" fill="#fff" fontSize="22" fontWeight="700" textAnchor="middle">{owner.initial}</text>
-      </motion.g>
-      <motion.g
-        animate={{ x: even ? -62 : 0 }}
-        transition={{ duration: 0.8, ease: EASE }}
-        onClick={onPick ? () => onPick("g") : undefined}
-        style={{ cursor: onPick ? "pointer" : undefined }}
-        role={onPick ? "button" : undefined}
-        aria-label={onPick ? `Show what ${MEMBER_LABEL} paid` : undefined}
-      >
-        {picked === "g" ? <circle cx={member.x} cy="64" r="37" fill="none" stroke="var(--accent-cyan)" strokeWidth="3" /> : null}
-        <circle cx={member.x} cy="64" r="32" fill="url(#baG)" opacity={picked && picked !== "g" ? 0.45 : 1} />
-        <text x={member.x} y="72" fill="#fff" fontSize="22" fontWeight="700" textAnchor="middle">{member.initial}</text>
-      </motion.g>
-
-      {even ? (
-        <motion.text x="160" y="118" fill="#34c759" fontSize="12" fontWeight="600" textAnchor="middle"
-          initial={{ opacity: still ? 1 : 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}>
-          All even
-        </motion.text>
-      ) : (
-        <>
-          <motion.line
-            key={`${memberOwes}-${pulse}`}
-            x1={x1} y1="64" x2={x2} y2="64"
-            stroke="var(--accent-cyan)" strokeWidth="3" strokeLinecap="round"
-            initial={animateArrow ? { pathLength: 0, opacity: 1 } : false}
-            animate={{ pathLength: 1 }}
-            transition={{ duration: 0.7, ease: EASE }}
-          />
-          <motion.polygon
-            key={`head-${memberOwes}-${pulse}`}
-            points={dir > 0 ? `${x2 + 4},64 ${x2 - 10},56 ${x2 - 10},72` : `${x2 - 4},64 ${x2 + 10},56 ${x2 + 10},72`}
-            fill="var(--accent-cyan)"
-            initial={animateArrow ? { opacity: 0 } : false}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.55, duration: 0.25 }}
-          />
-          {animateArrow ? (
-            <motion.circle
-              key={`ring-${pulse}`}
-              cx={to.x} cy="64" r="32"
-              fill="none" stroke="var(--accent-cyan)" strokeWidth="3"
-              initial={{ opacity: 0.8, scale: 1 }}
-              animate={{ opacity: 0, scale: 1.45 }}
-              transition={{ delay: 0.6, duration: 0.8, ease: "easeOut" }}
-              style={{ transformOrigin: `${to.x}px 64px` }}
-            />
-          ) : null}
-          {showAmount ? (
-          <motion.g
-            key={`amount-${pulse}`}
-            initial={animateArrow ? { opacity: 0, y: 6 } : false}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.35, duration: 0.5, ease: EASE }}
-          >
-            <rect x="106" y="28" width="108" height="26" rx="9" fill="color-mix(in srgb, var(--accent-cyan) 14%, transparent)" stroke="color-mix(in srgb, var(--accent-cyan) 35%, transparent)" />
-            <text x="160" y="46" fill="var(--accent-cyan)" fontSize="14" fontWeight="600" textAnchor="middle"
-              style={{ fontVariantNumeric: "tabular-nums" }}>
-              {formatCurrency(amount)}
-            </text>
-          </motion.g>
-          ) : null}
-        </>
-      )}
     </svg>
   );
 }
@@ -301,7 +225,7 @@ export function SyncArt({ status, className }: { status: SyncArtStatus; classNam
   const still = useReducedMotion();
   const live = status === "syncing";
   const ok = status === "synced" || status === "idle";
-  const wire = ok ? "#34c759" : live ? "#007aff" : "rgba(127,127,127,0.5)";
+  const wire = ok ? "var(--success)" : live ? "var(--accent)" : "rgba(127,127,127,0.5)";
 
   return (
     <div className={cn("relative flex items-center justify-center gap-3", className)} aria-label={`Sync ${status}`} role="img">
@@ -311,10 +235,10 @@ export function SyncArt({ status, className }: { status: SyncArtStatus; classNam
         {live && !still ? (
           <>
             {/* A starting cx, or the first paint has none and the SVG complains. */}
-            <motion.circle r="3" cy="12" fill="#007aff"
+            <motion.circle r="3" cy="12" fill="var(--accent)"
               initial={{ cx: 4 }} animate={{ cx: [4, 116] }}
               transition={{ duration: 1.1, repeat: Infinity, ease: "linear" }} />
-            <motion.circle r="3" cy="12" fill="#5856d6"
+            <motion.circle r="3" cy="12" fill="var(--accent-secondary)"
               initial={{ cx: 116 }} animate={{ cx: [116, 4] }}
               transition={{ duration: 1.1, repeat: Infinity, ease: "linear", delay: 0.55 }} />
           </>
@@ -326,7 +250,7 @@ export function SyncArt({ status, className }: { status: SyncArtStatus; classNam
         {ok ? (
           <motion.g initial={{ scale: still ? 1 : 0 }} animate={{ scale: 1 }} transition={{ delay: 0.5, type: "spring", stiffness: 300, damping: 18 }}
             style={{ transformOrigin: "60px 12px" }}>
-            <circle cx="60" cy="12" r="9" fill="#34c759" />
+            <circle cx="60" cy="12" r="9" fill="var(--success)" />
             <path d="M55.5 12.2 L58.6 15.2 L64.5 9.3" stroke="#fff" strokeWidth="2.2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
           </motion.g>
         ) : null}
@@ -346,7 +270,7 @@ const BURST = Array.from({ length: 14 }, (_, i) => {
   return {
     x: Math.cos(angle) * dist,
     y: Math.sin(angle) * dist,
-    color: ["#34c759", "#007aff", "#5856d6", "#af52de", "#5ac8fa"][i % 5]!,
+    color: ["var(--success)", "var(--accent)", "var(--accent-secondary)", "var(--feature)", "var(--accent-cyan)"][i % 5]!,
     size: 3 + (i % 3),
   };
 });
@@ -368,7 +292,7 @@ export function SpendDoneArt({ className }: { className?: string }) {
           ))
         : null}
       <motion.span
-        className="absolute inset-2 rounded-full bg-[#34c759]/20"
+        className="absolute inset-2 rounded-full bg-positive/20"
         initial={{ scale: still ? 1 : 0.4, opacity: still ? 1 : 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ type: "spring", stiffness: 260, damping: 16 }}
@@ -376,7 +300,7 @@ export function SpendDoneArt({ className }: { className?: string }) {
       <svg viewBox="0 0 48 48" className="absolute inset-4">
         <motion.path
           d="M12 25 L20 33 L36 16"
-          fill="none" stroke="#34c759" strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round"
+          fill="none" stroke="var(--success)" strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round"
           initial={{ pathLength: still ? 1 : 0 }}
           animate={{ pathLength: 1 }}
           transition={{ duration: 0.5, delay: 0.2, ease: EASE }}
@@ -392,7 +316,7 @@ export function SpendDoneArt({ className }: { className?: string }) {
 
 export function Sparkline({
   points,
-  color = "#007aff",
+  color = "var(--accent)",
   height = 36,
   className,
 }: {
@@ -442,15 +366,15 @@ export function Sparkline({
 export function MemoryPulse({ count, className }: { count: number; className?: string }) {
   return (
     <span className={cn("relative inline-flex h-10 w-10 shrink-0 items-center justify-center", className)} aria-hidden="true">
-      {count > 0 ? <span className="kg-pulse absolute inset-0 rounded-full border border-[#af52de]/60" /> : null}
-      <span className="absolute inset-1 rounded-full bg-[#af52de]/15" />
-      <Brain className="relative h-5 w-5 text-[#af52de]" />
+      {count > 0 ? <span className="kg-pulse absolute inset-0 rounded-full border border-feature/60" /> : null}
+      <span className="absolute inset-1 rounded-full bg-feature/15" />
+      <Brain className="relative h-5 w-5 text-feature" />
       {count > 0 ? (
-        <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#af52de] px-1 text-[9px] font-bold text-white tabular-nums">
+        <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-feature px-1 text-[9px] font-bold text-white tabular-nums">
           {count}
         </span>
       ) : (
-        <Check className="absolute -right-0.5 -top-0.5 h-3.5 w-3.5 rounded-full bg-[#34c759] p-0.5 text-white" />
+        <Check className="absolute -right-0.5 -top-0.5 h-3.5 w-3.5 rounded-full bg-positive p-0.5 text-white" />
       )}
     </span>
   );

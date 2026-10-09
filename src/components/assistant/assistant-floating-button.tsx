@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Mic, Radio } from "lucide-react";
-import { AssistantPanel } from "@/components/assistant/assistant-panel";
+import { AssistantWorkspace } from "@/components/assistant/workspace/assistant-workspace";
 import { AssistantLiveOrb } from "@/components/assistant/assistant-live-orb";
 import { AssistantWakeListener } from "@/components/assistant/assistant-wake-listener";
 import { useAssistant } from "@/components/assistant/assistant-context";
@@ -48,7 +48,7 @@ export function AssistantFloatingButton() {
             }}
             className="pointer-events-auto hidden sm:inline-flex max-w-[min(calc(100vw-2rem),18rem)] items-center gap-1.5 rounded-full glass px-2.5 py-1 text-[10px] font-medium text-muted shadow-sm text-left"
           >
-            <Radio className="h-3 w-3 shrink-0 text-[#34c759]" />
+            <Radio className="h-3 w-3 shrink-0 text-positive" />
             <span className="leading-snug">Say &quot;{wakePhrase}&quot; to wake me</span>
           </button>
         ) : null}
@@ -72,8 +72,8 @@ export function AssistantFloatingButton() {
             }}
             className={cn(
               "assistant-fab-button pointer-events-auto relative flex items-center justify-center rounded-full",
-              "bg-gradient-to-br from-[#007aff] to-[#5856d6] text-white",
-              "shadow-xl shadow-[#007aff]/35 h-14 w-14 p-0",
+              "bg-gradient-to-br from-accent to-indigo text-white",
+              "shadow-xl shadow-accent/35 h-14 w-14 p-0",
               "sm:h-auto sm:w-auto sm:gap-2 sm:pl-4 sm:pr-5 sm:py-3.5",
               "hover:scale-[1.03] active:scale-[0.97] transition-transform"
             )}
@@ -93,8 +93,8 @@ export function AssistantFloatingButton() {
       </div>
       ) : null}
 
-      {/* Keyed on open so every opening starts from a fresh panel state. */}
-      <AssistantPanel key={open ? "open" : "closed"} open={open} onVoiceLiveChange={setVoiceLive} />
+      {/* Keyed on open so every opening starts from a fresh workspace. */}
+      <AssistantWorkspace key={open ? "open" : "closed"} open={open} onVoiceLiveChange={setVoiceLive} />
     </>
   );
 }

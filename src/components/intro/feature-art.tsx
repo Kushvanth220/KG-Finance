@@ -22,16 +22,16 @@ export function DashboardArt() {
     <svg viewBox="0 0 390 844" className="h-full w-full" role="img" aria-label="KG Finance dashboard">
       <defs>
         <radialGradient id="dbGlowA" cx="20%" cy="12%" r="60%">
-          <stop offset="0" stopColor="#007aff" stopOpacity="0.28" />
-          <stop offset="1" stopColor="#007aff" stopOpacity="0" />
+          <stop offset="0" stopColor="var(--accent)" stopOpacity="0.28" />
+          <stop offset="1" stopColor="var(--accent)" stopOpacity="0" />
         </radialGradient>
         <radialGradient id="dbGlowB" cx="85%" cy="6%" r="50%">
-          <stop offset="0" stopColor="#5856d6" stopOpacity="0.22" />
-          <stop offset="1" stopColor="#5856d6" stopOpacity="0" />
+          <stop offset="0" stopColor="var(--accent-secondary)" stopOpacity="0.22" />
+          <stop offset="1" stopColor="var(--accent-secondary)" stopOpacity="0" />
         </radialGradient>
         <linearGradient id="dbSpend" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#007aff" />
-          <stop offset="1" stopColor="#5856d6" />
+          <stop offset="0" stopColor="var(--accent)" />
+          <stop offset="1" stopColor="var(--accent-secondary)" />
         </linearGradient>
       </defs>
 
@@ -40,24 +40,24 @@ export function DashboardArt() {
       <rect width="390" height="844" fill="url(#dbGlowB)" />
 
       {/* header */}
-      <text x="20" y="72" fill="#f5f5f7" fontSize="20" fontWeight="700">Dashboard</text>
+      <text x="20" y="72" fill="var(--foreground)" fontSize="20" fontWeight="700">Dashboard</text>
       <text x="20" y="92" fill="rgba(235,235,245,.6)" fontSize="11">September 2026</text>
       <rect x="292" y="56" width="78" height="30" rx="10" fill="url(#dbSpend)" />
       <text x="331" y="76" fill="#fff" fontSize="12" fontWeight="600" textAnchor="middle">+ Spend</text>
 
       {/* person tabs */}
       <rect x="20" y="112" width="350" height="36" rx="12" fill="rgba(44,44,46,.72)" stroke="rgba(255,255,255,.12)" />
-      <rect x="24" y="116" width="171" height="28" rx="9" fill="#007aff" />
+      <rect x="24" y="116" width="171" height="28" rx="9" fill="var(--accent)" />
       <text x="109" y="134" fill="#fff" fontSize="12" fontWeight="600" textAnchor="middle">Kushvanth</text>
       <text x="282" y="134" fill="rgba(235,235,245,.6)" fontSize="12" fontWeight="600" textAnchor="middle">G</text>
 
       {/* account balance card */}
       <rect x="20" y="168" width="350" height="214" rx="20" fill="rgba(44,44,46,.72)" stroke="rgba(255,255,255,.12)" />
-      <rect x="20" y="168" width="350" height="3" rx="1.5" fill="#34c759" opacity="0.9" />
-      <text x="40" y="200" fill="#f5f5f7" fontSize="12" fontWeight="600">Account balance</text>
-      <text x="350" y="200" fill="#007aff" fontSize="11" fontWeight="600" textAnchor="end">Manage ›</text>
+      <rect x="20" y="168" width="350" height="3" rx="1.5" fill="var(--success)" opacity="0.9" />
+      <text x="40" y="200" fill="var(--foreground)" fontSize="12" fontWeight="600">Account balance</text>
+      <text x="350" y="200" fill="var(--accent)" fontSize="11" fontWeight="600" textAnchor="end">Manage ›</text>
       <text x="40" y="222" fill="rgba(235,235,245,.6)" fontSize="9" letterSpacing="1">AVAILABLE</text>
-      <text x="40" y="256" fill="#34c759" fontSize="30" fontWeight="600" style={{ fontVariantNumeric: "tabular-nums" }}>$2,184.50</text>
+      <text x="40" y="256" fill="var(--success)" fontSize="30" fontWeight="600" style={{ fontVariantNumeric: "tabular-nums" }}>$2,184.50</text>
       <line x1="40" y1="276" x2="350" y2="276" stroke="rgba(255,255,255,.08)" />
       {[
         ["Checking", "$1,420.00"],
@@ -65,48 +65,48 @@ export function DashboardArt() {
         ["Cash wallet", "$124.50"],
       ].map(([name, amount], i) => (
         <g key={name}>
-          <text x="40" y={302 + i * 26} fill="#f5f5f7" fontSize="12">{name}</text>
-          <text x="350" y={302 + i * 26} fill="#f5f5f7" fontSize="12" fontWeight="600" textAnchor="end" style={{ fontVariantNumeric: "tabular-nums" }}>{amount}</text>
+          <text x="40" y={302 + i * 26} fill="var(--foreground)" fontSize="12">{name}</text>
+          <text x="350" y={302 + i * 26} fill="var(--foreground)" fontSize="12" fontWeight="600" textAnchor="end" style={{ fontVariantNumeric: "tabular-nums" }}>{amount}</text>
         </g>
       ))}
 
       {/* spending card with donut */}
       <rect x="20" y="398" width="350" height="230" rx="20" fill="rgba(44,44,46,.72)" stroke="rgba(255,255,255,.12)" />
-      <text x="40" y="430" fill="#f5f5f7" fontSize="12" fontWeight="600">Spending</text>
+      <text x="40" y="430" fill="var(--foreground)" fontSize="12" fontWeight="600">Spending</text>
       <text x="350" y="430" fill="rgba(235,235,245,.6)" fontSize="10" textAnchor="end">This month</text>
       <g transform="translate(110 528)">
         <circle r="58" fill="none" stroke="rgba(255,255,255,.06)" strokeWidth="16" />
-        <circle r="58" fill="none" stroke="#007aff" strokeWidth="16" pathLength={100} strokeDasharray="42 100" transform="rotate(-90)" />
-        <circle r="58" fill="none" stroke="#34c759" strokeWidth="16" pathLength={100} strokeDasharray="27 100" strokeDashoffset={-42} transform="rotate(-90)" />
-        <circle r="58" fill="none" stroke="#ff9500" strokeWidth="16" pathLength={100} strokeDasharray="19 100" strokeDashoffset={-69} transform="rotate(-90)" />
-        <circle r="58" fill="none" stroke="#af52de" strokeWidth="16" pathLength={100} strokeDasharray="12 100" strokeDashoffset={-88} transform="rotate(-90)" />
-        <text y="-2" fill="#f5f5f7" fontSize="16" fontWeight="600" textAnchor="middle" style={{ fontVariantNumeric: "tabular-nums" }}>$1,362</text>
+        <circle r="58" fill="none" stroke="var(--accent)" strokeWidth="16" pathLength={100} strokeDasharray="42 100" transform="rotate(-90)" />
+        <circle r="58" fill="none" stroke="var(--success)" strokeWidth="16" pathLength={100} strokeDasharray="27 100" strokeDashoffset={-42} transform="rotate(-90)" />
+        <circle r="58" fill="none" stroke="var(--warning)" strokeWidth="16" pathLength={100} strokeDasharray="19 100" strokeDashoffset={-69} transform="rotate(-90)" />
+        <circle r="58" fill="none" stroke="var(--feature)" strokeWidth="16" pathLength={100} strokeDasharray="12 100" strokeDashoffset={-88} transform="rotate(-90)" />
+        <text y="-2" fill="var(--foreground)" fontSize="16" fontWeight="600" textAnchor="middle" style={{ fontVariantNumeric: "tabular-nums" }}>$1,362</text>
         <text y="14" fill="rgba(235,235,245,.6)" fontSize="9" textAnchor="middle">spent</text>
       </g>
       {[
-        ["#007aff", "Groceries", "$572"],
-        ["#34c759", "Fuel", "$368"],
-        ["#ff9500", "Eating out", "$259"],
-        ["#af52de", "Phone", "$163"],
+        ["var(--accent)", "Groceries", "$572"],
+        ["var(--success)", "Fuel", "$368"],
+        ["var(--warning)", "Eating out", "$259"],
+        ["var(--feature)", "Phone", "$163"],
       ].map(([color, name, amount], i) => (
         <g key={name} transform={`translate(200 ${482 + i * 26})`}>
           <circle cx="4" cy="-4" r="4" fill={color} />
-          <text x="16" fill="#f5f5f7" fontSize="11">{name}</text>
-          <text x="150" fill="#f5f5f7" fontSize="11" fontWeight="600" textAnchor="end" style={{ fontVariantNumeric: "tabular-nums" }}>{amount}</text>
+          <text x="16" fill="var(--foreground)" fontSize="11">{name}</text>
+          <text x="150" fill="var(--foreground)" fontSize="11" fontWeight="600" textAnchor="end" style={{ fontVariantNumeric: "tabular-nums" }}>{amount}</text>
         </g>
       ))}
 
       {/* balance strip */}
       <rect x="20" y="644" width="350" height="72" rx="20" fill="rgba(44,44,46,.72)" stroke="rgba(255,255,255,.12)" />
       <text x="40" y="672" fill="rgba(235,235,245,.6)" fontSize="9" letterSpacing="1">BALANCE</text>
-      <text x="40" y="698" fill="#f5f5f7" fontSize="14" fontWeight="600">G owes Kushvanth</text>
-      <text x="350" y="698" fill="#5ac8fa" fontSize="18" fontWeight="600" textAnchor="end" style={{ fontVariantNumeric: "tabular-nums" }}>$318.40</text>
+      <text x="40" y="698" fill="var(--foreground)" fontSize="14" fontWeight="600">G owes Kushvanth</text>
+      <text x="350" y="698" fill="var(--accent-cyan)" fontSize="18" fontWeight="600" textAnchor="end" style={{ fontVariantNumeric: "tabular-nums" }}>$318.40</text>
 
       {/* bottom nav */}
       <rect x="20" y="748" width="350" height="64" rx="24" fill="rgba(44,44,46,.86)" stroke="rgba(255,255,255,.12)" />
       {(
         [
-          ["Home", 74, "#007aff"],
+          ["Home", 74, "var(--accent)"],
           ["Spend", 156, "#fff"],
           ["Balance", 238, "rgba(235,235,245,.6)"],
           ["More", 320, "rgba(235,235,245,.6)"],
@@ -135,10 +135,10 @@ export function DashboardArt() {
 
 const SLICES = (
   [
-    { color: "#007aff", share: 0.42, label: "Groceries" },
-    { color: "#34c759", share: 0.27, label: "Fuel" },
-    { color: "#ff9500", share: 0.19, label: "Eating out" },
-    { color: "#af52de", share: 0.12, label: "Phone" },
+    { color: "var(--accent)", share: 0.42, label: "Groceries" },
+    { color: "var(--success)", share: 0.27, label: "Fuel" },
+    { color: "var(--warning)", share: 0.19, label: "Eating out" },
+    { color: "var(--feature)", share: 0.12, label: "Phone" },
   ] as const
 ).reduce<{ color: string; share: number; label: string; from: number }[]>((acc, slice) => {
   const from = acc.reduce((sum, s) => sum + s.share, 0);
@@ -172,7 +172,7 @@ export function DonutArt() {
           />
         );
       })}
-      <text x="100" y="96" fill="#f5f5f7" fontSize="22" fontWeight="600" textAnchor="middle" style={{ fontVariantNumeric: "tabular-nums" }}>$1,362</text>
+      <text x="100" y="96" fill="var(--foreground)" fontSize="22" fontWeight="600" textAnchor="middle" style={{ fontVariantNumeric: "tabular-nums" }}>$1,362</text>
       <text x="100" y="116" fill="rgba(235,235,245,.6)" fontSize="10" textAnchor="middle">this month</text>
     </svg>
   );
@@ -188,12 +188,12 @@ export function SplitArt() {
     <svg viewBox="0 0 320 160" className="h-full w-full" role="img" aria-label="Shared balance">
       <defs>
         <linearGradient id="spK" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#0A84FF" />
-          <stop offset="1" stopColor="#5E5CE6" />
+          <stop offset="0" stopColor="var(--accent)" />
+          <stop offset="1" stopColor="#3781fc" />
         </linearGradient>
         <linearGradient id="spG" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#7F5AF0" />
-          <stop offset="1" stopColor="#C74FE6" />
+          <stop offset="0" stopColor="#a78bfa" />
+          <stop offset="1" stopColor="#b49cff" />
         </linearGradient>
       </defs>
       <circle cx="60" cy="80" r="34" fill="url(#spK)" />
@@ -204,7 +204,7 @@ export function SplitArt() {
       {/* the arrow travels from the one who owes to the one who is owed */}
       <motion.line
         x1="218" y1="80" x2="102" y2="80"
-        stroke="#5ac8fa" strokeWidth="3" strokeLinecap="round"
+        stroke="var(--accent-cyan)" strokeWidth="3" strokeLinecap="round"
         initial={{ pathLength: still ? 1 : 0 }}
         whileInView={{ pathLength: 1 }}
         viewport={{ once: true, amount: 0.6 }}
@@ -212,7 +212,7 @@ export function SplitArt() {
       />
       <motion.polygon
         points="98,80 112,72 112,88"
-        fill="#5ac8fa"
+        fill="var(--accent-cyan)"
         initial={{ opacity: still ? 1 : 0 }}
         whileInView={{ opacity: 1 }}
         viewport={{ once: true, amount: 0.6 }}
@@ -225,7 +225,7 @@ export function SplitArt() {
         transition={{ delay: 0.5, duration: 0.5, ease: EASE }}
       >
         <rect x="112" y="46" width="96" height="24" rx="8" fill="rgba(44,44,46,.9)" stroke="rgba(255,255,255,.12)" />
-        <text x="160" y="62" fill="#5ac8fa" fontSize="13" fontWeight="600" textAnchor="middle" style={{ fontVariantNumeric: "tabular-nums" }}>$318.40</text>
+        <text x="160" y="62" fill="var(--accent-cyan)" fontSize="13" fontWeight="600" textAnchor="middle" style={{ fontVariantNumeric: "tabular-nums" }}>$318.40</text>
       </motion.g>
       <text x="160" y="126" fill="rgba(235,235,245,.6)" fontSize="11" textAnchor="middle">G owes Kushvanth</text>
     </svg>
@@ -263,7 +263,7 @@ export function FlexArt() {
         return (
           <g key={d.day}>
             <motion.rect
-              x={x} y={bottom - baseH} width={barW} height={baseH} rx="4" fill="#0077ff"
+              x={x} y={bottom - baseH} width={barW} height={baseH} rx="4" fill="#3781fc"
               style={{ transformBox: "fill-box", transformOrigin: "bottom" }}
               initial={{ scaleY: still ? 1 : 0 }}
               whileInView={{ scaleY: 1 }}
@@ -271,7 +271,7 @@ export function FlexArt() {
               transition={{ duration: 0.7, ease: EASE, delay: i * 0.06 }}
             />
             <motion.rect
-              x={x} y={bottom - baseH - tipH} width={barW} height={tipH} rx="4" fill="#34c759"
+              x={x} y={bottom - baseH - tipH} width={barW} height={tipH} rx="4" fill="var(--success)"
               style={{ transformBox: "fill-box", transformOrigin: "bottom" }}
               initial={{ scaleY: still ? 1 : 0 }}
               whileInView={{ scaleY: 1 }}
@@ -279,7 +279,7 @@ export function FlexArt() {
               transition={{ duration: 0.7, ease: EASE, delay: 0.25 + i * 0.06 }}
             />
             {d.base > 0 ? (
-              <text x={x + barW / 2} y={bottom - baseH - tipH - 6} fill="#f5f5f7" fontSize="9" textAnchor="middle" style={{ fontVariantNumeric: "tabular-nums" }}>
+              <text x={x + barW / 2} y={bottom - baseH - tipH - 6} fill="var(--foreground)" fontSize="9" textAnchor="middle" style={{ fontVariantNumeric: "tabular-nums" }}>
                 ${d.base + d.tip}
               </text>
             ) : null}
@@ -326,10 +326,10 @@ export function NumbersFilm({ className }: { className?: string }) {
 
     const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const rows = [
-      { label: "Income", to: 4820, color: "#34c759", sign: "+" },
-      { label: "Spent", to: 1362, color: "#f5f5f7", sign: "" },
-      { label: "Amazon Flex", to: 1236.5, color: "#0077ff", sign: "+" },
-      { label: "Card balance", to: 0, from: 918, color: "#ff3b30", sign: "" },
+      { label: "Income", to: 4820, color: "var(--success)", sign: "+" },
+      { label: "Spent", to: 1362, color: "var(--foreground)", sign: "" },
+      { label: "Amazon Flex", to: 1236.5, color: "#3781fc", sign: "+" },
+      { label: "Card balance", to: 0, from: 918, color: "var(--danger)", sign: "" },
     ];
 
     let frame = 0;
@@ -358,7 +358,7 @@ export function NumbersFilm({ className }: { className?: string }) {
       const t = elapsed / 1000;
 
       ctx.clearRect(0, 0, w, h);
-      ctx.fillStyle = "#050508";
+      ctx.fillStyle = "#02040c";
       ctx.fillRect(0, 0, w, h);
 
       // light moving like slow water behind the glass

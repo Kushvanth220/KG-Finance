@@ -21,8 +21,8 @@ export function StatCard({
   isCurrency = true,
 }: StatCardProps) {
   const trendColors = {
-    up: "text-[#34c759]",
-    down: "text-[#ff3b30]",
+    up: "text-positive",
+    down: "text-negative",
     neutral: "text-muted",
   };
 

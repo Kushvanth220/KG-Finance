@@ -35,6 +35,7 @@ import {
   applySpeakerToWrite,
 } from "@/lib/ai/infer-write-intent";
 import type { AssistantToolCall } from "@/lib/ai/tools";
+import type { AssistantActivity } from "@/components/assistant/use-assistant-chat";
 import { getClientFinancePayload } from "@/lib/ai/client-finance-context";
 import { getBehaviorInstructionsForAssistant, getRemindersForAssistant } from "@/store/assistant-preferences-store";
 import { getRulesForAssistant } from "@/store/rules-store";
@@ -123,6 +124,8 @@ interface AiVoicePanelProps {
   autoStart?: boolean;
   onAutoStartHandled?: () => void;
   onLiveChange?: (busy: boolean) => void;
+  /** What the call is doing — heard, tools reached for, answered — for a view to show. */
+  onActivity?: (activity: AssistantActivity) => void;
 }
 
 function resolveOrbState(options: {
@@ -159,8 +162,16 @@ export function AiVoicePanel({
   autoStart = false,
   onAutoStartHandled,
   onLiveChange,
+  onActivity,
 }: AiVoicePanelProps) {
   const { voiceStartSignal, registerVoiceStarter, clearAutoStart } = useAssistant();
+  // Read when a live event fires: those handlers are made once per call.
+  const activityRef = useRef(onActivity);
+  useEffect(() => {
+    activityRef.current = onActivity;
+  });
+  /** The model's words this turn, gathered from its transcription. */
+  const spokenReplyRef = useRef("");
   const [status, setStatus] = useState<"idle" | "connecting" | "live" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
   const [lines, setLines] = useState<VoiceLine[]>([]);
@@ -688,12 +699,20 @@ export function AiVoicePanel({
               finished: event.finished,
               interim: event.interim,
             });
+            if (event.finished && event.text?.trim()) {
+              activityRef.current?.({ type: "ask", text: event.text.trim() });
+            }
           },
           onOutputTranscription: (event) => {
             transcriptSessionRef.current?.addModelFragment(event.text, event.finished);
+            if (event.text) spokenReplyRef.current += event.text;
           },
           onTurnComplete: () => {
             transcriptSessionRef.current?.onTurnComplete();
+            const said = spokenReplyRef.current.trim();
+            spokenReplyRef.current = "";
+            if (said) activityRef.current?.({ type: "reply", text: said });
+            activityRef.current?.({ type: "idle" });
           },
           onInterrupted: () => {
             // Do not dump the speaker queue here. Echo / leftover mic often
@@ -722,6 +741,7 @@ export function AiVoicePanel({
               setToolBusy(false);
               return;
             }
+            activityRef.current?.({ type: "tools", calls: calls.map((call) => ({ name: call.name, args: call.args })) });
 
             const actor = speakerRef.current;
             const writeCalls = calls.filter((item) => writeNeedsSpeaker(item.name));
@@ -1052,14 +1072,14 @@ export function AiVoicePanel({
       {error ? (
         <div
           role="alert"
-          className="sticky top-0 z-20 rounded-xl bg-[#ff3b30]/12 border border-[#ff3b30]/30 px-3 py-2 text-[12px] text-[#ff3b30] text-center font-semibold backdrop-blur-md"
+          className="sticky top-0 z-20 rounded-xl bg-negative/12 border border-negative/30 px-3 py-2 text-[12px] text-negative text-center font-semibold backdrop-blur-md"
         >
           {error}
         </div>
       ) : needsSpeaker ? (
         <div className="sticky top-0 z-20 flex justify-center">
-          <div className="w-full max-w-sm rounded-xl bg-[#007aff]/10 border border-[#007aff]/25 px-3 py-2.5 space-y-2 backdrop-blur-md">
-            <p className="text-[11px] text-[#007aff] text-center font-medium">
+          <div className="w-full max-w-sm rounded-xl bg-accent/10 border border-accent/25 px-3 py-2.5 space-y-2 backdrop-blur-md">
+            <p className="text-[11px] text-accent text-center font-medium">
               Who am I talking to?
             </p>
             <div className="flex flex-wrap justify-center gap-2">
@@ -1082,7 +1102,7 @@ export function AiVoicePanel({
                       confirmVoiceWriteRef.current("Yes", { immediate: true });
                     }
                   }}
-                  className="min-h-11 rounded-full border border-[#007aff]/40 bg-[#007aff]/15 px-4 py-2 text-[13px] font-semibold text-[#007aff]"
+                  className="min-h-11 rounded-full border border-accent/40 bg-accent/15 px-4 py-2 text-[13px] font-semibold text-accent"
                 >
                   {chip.label}
                 </button>
@@ -1095,15 +1115,15 @@ export function AiVoicePanel({
           <div
             role="status"
             aria-live="polite"
-            className="w-full max-w-sm rounded-xl bg-[#34c759]/15 border border-[#34c759]/30 px-3 py-2 text-[12px] text-[#34c759] text-center font-semibold backdrop-blur-md"
+            className="w-full max-w-sm rounded-xl bg-positive/15 border border-positive/30 px-3 py-2 text-[12px] text-positive text-center font-semibold backdrop-blur-md"
           >
             {lastSavedBanner}
           </div>
         </div>
       ) : accountChoices.length > 0 ? (
         <div className="sticky top-0 z-20 flex justify-center">
-          <div className="w-full max-w-sm rounded-xl bg-[#007aff]/10 border border-[#007aff]/25 px-3 py-2.5 space-y-2 backdrop-blur-md">
-            <p className="text-[11px] text-[#007aff] text-center font-medium">
+          <div className="w-full max-w-sm rounded-xl bg-accent/10 border border-accent/25 px-3 py-2.5 space-y-2 backdrop-blur-md">
+            <p className="text-[11px] text-accent text-center font-medium">
               {accountChoicePrompt(pendingWrite?.name ?? "", accountChoiceKind)}
             </p>
             <div className="flex flex-wrap justify-center gap-2">
@@ -1134,7 +1154,7 @@ export function AiVoicePanel({
           <div
             role="region"
             aria-label="Confirm this money change"
-            className="w-full max-w-sm rounded-xl bg-[#ff9500]/10 border border-[#ff9500]/25 px-3 py-2.5 text-[11px] text-[#ff9500] text-center space-y-2 backdrop-blur-md"
+            className="w-full max-w-sm rounded-xl bg-caution/10 border border-caution/25 px-3 py-2.5 text-[11px] text-caution text-center space-y-2 backdrop-blur-md"
           >
             {pendingPreview ? <p className="font-medium text-[#ffb340]">{pendingPreview}</p> : null}
             {pendingWrite?.name === "record_expense" ? (
@@ -1158,7 +1178,7 @@ export function AiVoicePanel({
                         }}
                         className={`min-h-9 rounded-full border px-3 py-1.5 text-[11px] font-semibold ${
                           selected
-                            ? "border-[#007aff] bg-[#007aff]/15 text-[#007aff]"
+                            ? "border-accent bg-accent/15 text-accent"
                             : "border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/10 text-foreground"
                         }`}
                       >
@@ -1186,7 +1206,7 @@ export function AiVoicePanel({
                         }}
                         className={`min-h-9 rounded-full border px-3 py-1.5 text-[11px] font-semibold ${
                           selected
-                            ? "border-[#007aff] bg-[#007aff]/15 text-[#007aff]"
+                            ? "border-accent bg-accent/15 text-accent"
                             : "border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/10 text-foreground"
                         }`}
                       >
@@ -1226,7 +1246,7 @@ export function AiVoicePanel({
                 autoFocus
                 disabled={toolBusy}
                 onClick={() => confirmVoiceWriteRef.current("Yes", { immediate: true })}
-                className="flex-1 min-h-11 rounded-lg bg-[#34c759] text-white py-2 text-[13px] font-semibold disabled:opacity-50"
+                className="flex-1 min-h-11 rounded-lg bg-positive text-white py-2 text-[13px] font-semibold disabled:opacity-50"
               >
                 Yes, save
               </button>
@@ -1277,7 +1297,7 @@ export function AiVoicePanel({
             <button
               type="button"
               onClick={() => void stopVoice()}
-              className="shrink-0 inline-flex items-center gap-1 rounded-full bg-[#ff3b30] px-3 py-1.5 text-[11px] font-semibold text-white"
+              className="shrink-0 inline-flex items-center gap-1 rounded-full bg-negative px-3 py-1.5 text-[11px] font-semibold text-white"
             >
               <MicOff className="h-3.5 w-3.5" />
               {status === "connecting" ? "Cancel" : "Stop"}
@@ -1286,7 +1306,7 @@ export function AiVoicePanel({
             <button
               type="button"
               onClick={() => void startVoice()}
-              className="shrink-0 inline-flex items-center gap-1 rounded-full bg-[#007aff] px-3 py-1.5 text-[11px] font-semibold text-white"
+              className="shrink-0 inline-flex items-center gap-1 rounded-full bg-accent px-3 py-1.5 text-[11px] font-semibold text-white"
             >
               <Mic className="h-3.5 w-3.5" />
               {status === "error" ? "Retry" : "Start"}
@@ -1305,7 +1325,7 @@ export function AiVoicePanel({
           <ol className="space-y-1.5">
             {VOICE_STEPS.map((step, index) => (
               <li key={step} className="flex gap-2 text-[11px] text-muted">
-                <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-[#007aff] mt-0.5" />
+                <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-accent mt-0.5" />
                 <span>
                   <strong className="text-foreground/80">{index + 1}.</strong> {step}
                 </span>
@@ -1329,7 +1349,7 @@ export function AiVoicePanel({
                   "The user cleared this conversation. Forget prior chat. Stay silent until they speak. Do not greet."
                 );
               }}
-              className="inline-flex items-center gap-1 text-[10px] font-semibold text-white/50 hover:text-[#ff3b30]"
+              className="inline-flex items-center gap-1 text-[10px] font-semibold text-white/50 hover:text-negative"
             >
               <Trash2 className="w-3 h-3" />
               Clear history

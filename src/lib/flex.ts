@@ -12,7 +12,7 @@ import type { RuleDraft } from "@/store/rules-store";
  */
 
 /** Amazon Flex's blue, from the brand mark. */
-export const FLEX_BLUE = "#0077FF";
+export const FLEX_BLUE = "#3781fc";
 
 export const FLEX_RULE_NAME = "Amazon Flex blocks";
 

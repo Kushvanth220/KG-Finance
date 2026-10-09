@@ -34,6 +34,7 @@ export function createEmptyFinanceState(): FinanceState {
     settlementBalance: 0,
     deletedHistory: [],
     flexDeposits: [],
+    remittances: [],
   };
 }
 
@@ -56,6 +57,7 @@ export function isPristineFinanceState(state: FinanceState): boolean {
     empty(state.settlementHistory) &&
     empty(state.deletedHistory) &&
     empty(state.flexDeposits) &&
+    empty(state.remittances) &&
     (state.spendCategories ?? []).every((category) => category.id.startsWith("cat-"))
   );
 }

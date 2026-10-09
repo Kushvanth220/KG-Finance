@@ -1,33 +1,99 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f2f2f7;
-  --foreground: #1c1c1e;
-  --glass-bg: rgba(255, 255, 255, 0.72);
-  --glass-border: rgba(255, 255, 255, 0.8);
-  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
-  --accent: #007aff;
-  --accent-secondary: #5856d6;
-  --success: #34c759;
-  --warning: #ff9500;
-  --danger: #ff3b30;
-  /* The balance cyan: bright on black, deepened on the light ground so
-     an arrow or a figure in it still clears 4.5:1 against #f2f2f7. */
-  --accent-cyan: #0b74a6;
-  --muted: rgba(60, 60, 67, 0.6);
+  /* ---------------------------------------------------------------------
+     The palette lives here and ONLY here.
+     Components name a role — accent, positive, negative — never a hex, so
+     the whole app re-themes from these lines.
+
+     The ground, surfaces, text and hairlines come from the reference ramp:
+     #03195b → #0b2cb1 → #1951fc → #3781fc → #cbe9fd on black. Measured on
+     that ground, only #3781fc and #cbe9fd carry text; #1951fc is strong
+     enough for fills and borders; the two darks are surfaces. Each role
+     below is placed accordingly and clears 4.5:1.
+
+     Money is NOT from the ramp. Six blues cannot say "income" and
+     "spending" at a glance, and a finance app you have to read the label
+     on has failed at its one job — so positive/negative/caution stay
+     unmistakably green, red and amber, tuned to sit beside electric blue.
+     --------------------------------------------------------------------- */
+  --background: #f4f8ff;
+  --foreground: #03195b;
+  --glass-bg: rgba(255, 255, 255, 0.52);
+  --glass-border: rgba(11, 44, 177, 0.13);
+  --glass-shadow: 0 8px 26px rgba(3, 25, 91, 0.08), 0 1px 3px rgba(3, 25, 91, 0.04);
+  /* The lit top edge that makes a pane read as glass rather than paint. */
+  --glass-sheen: rgba(255, 255, 255, 0.95);
+  --glass-tint: transparent;
+
+  --accent: #0b2cb1;
+  --accent-secondary: #03195b;
+
+  --success: #1d7a55;
+  --warning: #8a5a10;
+  --danger: #b3303f;
+  --feature: #5b3fd1;
+  --amber: #7a5a12;
+  --pink: #a62c66;
+  --accent-cyan: #10628f;
+
+  /* Extra chart hues: a pie with fourteen slices needs more than one ramp,
+     and a pale fill that vanishes on white is not a colour. */
+  --chart-moss: #2a7d62;
+  --chart-sky: #2d6fa8;
+  --chart-gold: #7f5f1c;
+
+  /* Money Transfers: each destination keeps one colour on every chart, from
+     its flag — saffron for India, blue for the Philippines. A pair validated
+     for colour-blind separation and 3:1 against the page, per theme. */
+  --country-in: #b45309;
+  --country-ph: #0369a1;
+
+  --neutral: #4a5e85;
+  --muted: rgba(74, 94, 133, 0.78);
+
+  /* The lion: navy ink on a light ground, ice blue on a dark one — the two
+     ends of its own palette rings. */
+  --lion: #03195b;
+  /* The wordmark beside it: the same navy here, a whiter ice on dark. */
+  --wordmark: #03195b;
   --card-radius: 20px;
-  --blur: 24px;
+  --blur: 30px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #000000;
-    --foreground: #f5f5f7;
-    --glass-bg: rgba(44, 44, 46, 0.72);
-    --glass-border: rgba(255, 255, 255, 0.12);
-    --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-    --muted: rgba(235, 235, 245, 0.6);
-    --accent-cyan: #5ac8fa;
+    /* The reference image itself: black, with blue panels glowing on it. */
+    --background: #02040c;
+    --foreground: #cbe9fd;
+    --glass-bg: rgba(10, 32, 86, 0.3);
+    --glass-border: rgba(140, 190, 255, 0.26);
+    /* On black a shadow alone is invisible, so the lift comes from a faint
+       blue bloom as well — the panel glows the way the reference does. */
+    --glass-shadow: 0 14px 36px rgba(0, 0, 0, 0.55), 0 0 26px rgba(25, 81, 252, 0.08);
+    --glass-sheen: rgba(203, 233, 253, 0.24);
+    --glass-tint: transparent;
+    --muted: rgba(203, 233, 253, 0.62);
+
+    /* #1951fc is the ramp's heart but reaches only 3.53:1 here — fine for a
+       fill or a border, not for words. Anything carrying text is lifted. */
+    --accent: #3781fc;
+    --accent-secondary: #6f9dff;
+    --success: #2fe08a;
+    --warning: #ffb020;
+    --danger: #ff5d73;
+    --feature: #a78bfa;
+    --accent-cyan: #6cc6ff;
+    --amber: #ffc44d;
+    --pink: #ff6fae;
+    --chart-moss: #46d1a5;
+    --chart-sky: #8fd0ff;
+    --chart-gold: #ffd27a;
+    --country-in: #ea580c;
+    --country-ph: #0284c7;
+    --neutral: #9ab3d6;
+    --lion: #cbe9fd;
+    --wordmark: #e8f1ff;
   }
 }
 
@@ -36,6 +102,23 @@
   --color-foreground: var(--foreground);
   --color-accent: var(--accent);
   --color-muted: var(--muted);
+
+  /* Role colours as real utilities: text-positive, bg-negative/15, border-caution/40. */
+  --color-positive: var(--success);
+  --color-negative: var(--danger);
+  --color-caution: var(--warning);
+  --color-feature: var(--feature);
+  --color-indigo: var(--accent-secondary);
+  --color-cyan: var(--accent-cyan);
+  --color-amber: var(--amber);
+  --color-pink: var(--pink);
+  --color-neutral: var(--neutral);
+  --color-moss: var(--chart-moss);
+  --color-sky: var(--chart-sky);
+  --color-gold: var(--chart-gold);
+  --color-chalk: var(--foreground);
+  --color-lion: var(--lion);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -62,36 +145,74 @@ body {
   inset: 0;
   z-index: -1;
   background:
-    radial-gradient(ellipse 80% 50% at 20% 20%, rgba(0, 122, 255, 0.15), transparent),
-    radial-gradient(ellipse 60% 40% at 80% 10%, rgba(88, 86, 214, 0.12), transparent),
-    radial-gradient(ellipse 50% 50% at 50% 80%, rgba(52, 199, 89, 0.08), transparent),
+    radial-gradient(ellipse 80% 50% at 20% 20%, rgba(25, 81, 252, 0.12), transparent),
+    radial-gradient(ellipse 60% 40% at 80% 10%, rgba(55, 129, 252, 0.1), transparent),
+    radial-gradient(ellipse 50% 50% at 50% 80%, rgba(203, 233, 253, 0.42), transparent),
     var(--background);
 }
 
 @media (prefers-color-scheme: dark) {
   .mesh-bg {
     background:
-      radial-gradient(ellipse 80% 50% at 20% 20%, rgba(0, 122, 255, 0.2), transparent),
-      radial-gradient(ellipse 60% 40% at 80% 10%, rgba(88, 86, 214, 0.15), transparent),
-      radial-gradient(ellipse 50% 50% at 50% 80%, rgba(52, 199, 89, 0.06), transparent),
+      radial-gradient(ellipse 70% 45% at 18% 12%, rgba(11, 44, 177, 0.3), transparent),
+      radial-gradient(ellipse 55% 38% at 84% 8%, rgba(3, 25, 91, 0.42), transparent),
+      radial-gradient(ellipse 50% 45% at 50% 88%, rgba(25, 81, 252, 0.1), transparent),
       var(--background);
   }
 }
 
+/* ---------------------------------------------------------------------
+   Floating glass.
+
+   Three things make a pane read as glass rather than as a grey rectangle:
+   what you can see through it, a lit edge where light catches the top, and
+   a shadow proving it sits above the page. The first two are cheap; the
+   third is what sells it, and on a black ground a plain shadow is invisible
+   — so the lift comes from a faint blue bloom instead.
+   --------------------------------------------------------------------- */
 .glass {
   background: var(--glass-bg);
-  backdrop-filter: blur(var(--blur)) saturate(180%);
-  -webkit-backdrop-filter: blur(var(--blur)) saturate(180%);
+  backdrop-filter: blur(var(--blur)) saturate(150%);
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(150%);
   border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-shadow);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-sheen);
 }
 
 .glass-strong {
   background: var(--glass-bg);
-  backdrop-filter: blur(40px) saturate(200%);
-  -webkit-backdrop-filter: blur(40px) saturate(200%);
+  backdrop-filter: blur(38px) saturate(160%);
+  -webkit-backdrop-filter: blur(38px) saturate(160%);
   border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-shadow);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-sheen);
+}
+
+/**
+ * The chosen option in a glass track.
+ *
+ * A solid block of accent was the old answer, and it read as paint stuck on
+ * top of the glass. This is a lit pane instead: tinted, edged, and glowing
+ * just enough to float a step above the track it sits in. The label keeps
+ * the page's own text colour, so it never depends on the tint for contrast.
+ */
+.glass-pill {
+  background: color-mix(in srgb, var(--pill-tint, var(--accent)) 20%, transparent);
+  border: 1px solid color-mix(in srgb, var(--pill-tint, var(--accent)) 46%, transparent);
+  box-shadow:
+    0 2px 10px color-mix(in srgb, var(--pill-tint, var(--accent)) 22%, transparent),
+    inset 0 1px 0 var(--glass-sheen);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  color: var(--foreground);
+}
+
+/* Inputs and selects: the same glass, pressed into the page rather than
+   floating above it, so a field never looks like a button. */
+.glass-field {
+  background: color-mix(in srgb, var(--glass-bg) 55%, transparent);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border: 1px solid var(--glass-border);
+  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
 @keyframes fade-in-up {
@@ -125,27 +246,6 @@ body {
 }
 
 /* KG Finance brand animations */
-@keyframes kg-gradient-flow {
-  0%,
-  100% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-}
-
-@keyframes kg-letter-in {
-  from {
-    opacity: 0;
-    transform: translateY(10px) scale(0.85);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
 @keyframes kg-glow-pulse {
   0%,
   100% {
@@ -155,15 +255,6 @@ body {
   50% {
     opacity: 0.65;
     transform: scale(1.05);
-  }
-}
-
-@keyframes kg-shimmer {
-  0% {
-    transform: translateX(-120%);
-  }
-  100% {
-    transform: translateX(220%);
   }
 }
 
@@ -188,49 +279,135 @@ body {
   animation: kg-glow-pulse 4s ease-in-out infinite;
 }
 
-.kg-gradient-text {
-  background: linear-gradient(
-    90deg,
-    #007aff,
-    #5856d6,
-    #af52de,
-    #ff2d55,
-    #007aff
-  );
-  background-size: 300% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: kg-gradient-flow 5s ease infinite;
+/* Behind the lion: a breath of its own blue. */
+.kg-lion-glow {
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 50%, transparent), transparent 70%);
+  animation: kg-glow-pulse 4s ease-in-out infinite;
 }
 
-.kg-letter {
-  animation: kg-letter-in 0.55s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+/* The balance see-saw's avatars are buttons: a round focus ring for the
+   keyboard instead of the browser's box, and nothing on a tap. */
+.kg-seat {
+  outline: none;
 }
 
-.kg-finance-text {
-  position: relative;
-  background: linear-gradient(135deg, #5856d6 0%, #af52de 50%, #007aff 100%);
-  background-size: 200% 200%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: kg-gradient-flow 6s ease infinite reverse;
+.kg-seat-focus {
+  opacity: 0;
 }
 
-.kg-finance-text::after {
-  content: "";
+.kg-seat:focus-visible .kg-seat-focus {
+  opacity: 1;
+}
+
+/* ---------------------------------------------------------------------
+   Launch screen — one dark world, whatever the phone's theme.
+
+   The ground matches the one the lion's canvas paints (navy at the lion,
+   near-black at the edges), so there is no seam before the canvas draws.
+   --------------------------------------------------------------------- */
+.kg-splash {
+  --lion: #cbe9fd;
+  --wordmark: #e8f1ff;
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  color-scheme: dark;
+  background: radial-gradient(circle 75vmax at 50% 43%, #0c2468, #030918);
+  touch-action: none;
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* If the app never starts, the ground must not hold the page hostage. */
+.kg-splash:not([data-live]) {
+  animation: kg-splash-failsafe 0.4s ease 8s forwards;
+}
+
+@keyframes kg-splash-failsafe {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+.kg-splash[data-leaving] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.kg-splash canvas {
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    105deg,
-    transparent 40%,
-    rgba(255, 255, 255, 0.55) 50%,
-    transparent 60%
-  );
-  animation: kg-shimmer 4s ease-in-out infinite;
+}
+
+.kg-splash-name {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(var(--lion-bottom, 72%) + 28px);
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding-inline: 16px;
   pointer-events: none;
-  mix-blend-mode: overlay;
+}
+
+/* The name is mounted when it comes into focus, so its entrance plays from the first frame it exists. */
+.kg-splash-word {
+  font-size: clamp(30px, 7.6vw, 48px);
+  line-height: 1.1;
+}
+
+.kg-splash-tag {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  text-align: center;
+  color: rgba(203, 233, 253, 0.62);
+  animation: kg-splash-fade 0.7s ease 0.9s both;
+}
+
+@keyframes kg-splash-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ---------------------------------------------------------------------
+   The wordmark: "KG Finance" in Cinzel, KG at 800 and Finance at 400.
+   The one place the app leaves Geist — see components/brand/wordmark.
+   --------------------------------------------------------------------- */
+.kg-wordmark {
+  font-family: var(--font-cinzel), Georgia, "Times New Roman", serif;
+  color: var(--wordmark);
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.kg-wordmark-kg {
+  font-weight: 800;
+}
+
+.kg-wordmark-fin {
+  font-weight: 400;
+}
+
+.kg-wordmark-letter {
+  display: inline-block;
+}
+
+/* Each letter comes into focus out of a blur; the stagger is set per letter. */
+.kg-wordmark-enter .kg-wordmark-letter {
+  animation: kg-blur-focus 0.95s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@keyframes kg-blur-focus {
+  from {
+    opacity: 0;
+    filter: blur(14px);
+    transform: scale(1.35);
+  }
 }
 
 .kg-subtitle {
@@ -238,526 +415,17 @@ body {
 }
 
 .kg-name-owner {
-  color: #007aff;
+  color: var(--accent);
   font-weight: 600;
 }
 
 .kg-name-member {
-  color: #af52de;
+  color: var(--feature);
   font-weight: 600;
 }
 
 .kg-amp {
   animation: kg-glow-pulse 3s ease-in-out infinite;
-}
-
-body.kg-splash-active {
-  overflow: hidden;
-}
-
-/* Netflix-style launch / route splash */
-.kg-splash-root {
-  position: fixed;
-  inset: 0;
-  z-index: 90;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: all;
-}
-
-.kg-splash-scrim {
-  position: absolute;
-  inset: 0;
-  background: #030305;
-}
-
-.kg-splash-mesh {
-  position: absolute;
-  inset: 0;
-  opacity: 0.9;
-  background:
-    radial-gradient(ellipse 70% 55% at 50% 42%, rgba(0, 122, 255, 0.22), transparent 68%),
-    radial-gradient(ellipse 50% 40% at 20% 70%, rgba(88, 86, 214, 0.16), transparent 70%),
-    radial-gradient(ellipse 45% 35% at 82% 68%, rgba(175, 82, 222, 0.14), transparent 72%);
-}
-
-/*
- * Exit on the ROOT, not the scrim — fading only the backdrop left the monogram
- * and wordmark floating over the live page for the last ~650ms.
- * Easing slightly past 1 on scale reads as pushing through into the app.
- */
-.kg-splash-root-launch {
-  animation: kg-splash-exit 0.7s cubic-bezier(0.55, 0, 0.85, 0.3) 2.5s forwards;
-}
-
-.kg-splash-root-launch .kg-splash-scrim {
-  animation: kg-splash-scrim-in 0.4s ease-out both;
-}
-
-.kg-splash-root-launch .kg-splash-mesh {
-  animation: kg-splash-mesh-pulse 2.8s ease-in-out both;
-}
-
-.kg-splash-root-route {
-  animation: kg-splash-exit 0.4s cubic-bezier(0.55, 0, 0.85, 0.3) 0.55s forwards;
-}
-
-.kg-splash-root-route .kg-splash-scrim {
-  background: rgba(3, 3, 5, 0.78);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  animation: kg-splash-route-in 0.2s ease-out both;
-}
-
-.kg-splash-root-return {
-  animation: kg-splash-exit 0.5s cubic-bezier(0.55, 0, 0.85, 0.3) 1.2s forwards;
-}
-
-.kg-splash-root-return .kg-splash-scrim {
-  background: rgba(3, 3, 5, 0.86);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  animation: kg-splash-route-in 0.25s ease-out both;
-}
-
-.kg-splash-root-return .kg-splash-mesh {
-  animation: kg-splash-mesh-pulse 1.4s ease-in-out both;
-}
-
-.kg-splash-mark {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-.kg-splash-particles {
-  position: absolute;
-  inset: -30vh -20vw;
-  pointer-events: none;
-}
-
-.kg-splash-particle {
-  position: absolute;
-  bottom: -10%;
-  border-radius: 999px;
-  background: linear-gradient(135deg, rgba(0, 122, 255, 0.9), rgba(175, 82, 222, 0.8));
-  box-shadow: 0 0 10px rgba(0, 122, 255, 0.35);
-  animation: kg-splash-particle-rise 2.2s ease-out forwards;
-  opacity: 0;
-}
-
-.kg-splash-sweep {
-  position: absolute;
-  top: 50%;
-  left: -120%;
-  width: 45%;
-  height: 2px;
-  transform: translateY(-50%) rotate(-8deg);
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.75), transparent);
-  filter: blur(0.5px);
-  opacity: 0;
-}
-
-.kg-splash-root-launch .kg-splash-sweep {
-  animation: kg-splash-sweep 0.85s ease-in-out 0.45s both;
-}
-
-.kg-splash-burst {
-  position: absolute;
-  width: 8rem;
-  height: 8rem;
-  border-radius: 999px;
-  background: radial-gradient(circle, rgba(0, 122, 255, 0.5) 0%, rgba(175, 82, 222, 0.22) 45%, transparent 70%);
-  filter: blur(8px);
-}
-
-.kg-splash-burst-2 {
-  width: 11rem;
-  height: 11rem;
-  background: radial-gradient(circle, rgba(88, 86, 214, 0.35) 0%, transparent 65%);
-}
-
-.kg-splash-ring {
-  position: absolute;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-}
-
-.kg-splash-ring-1 {
-  width: 7rem;
-  height: 7rem;
-}
-
-.kg-splash-ring-2 {
-  width: 9.5rem;
-  height: 9.5rem;
-}
-
-.kg-splash-ring-3 {
-  width: 12rem;
-  height: 12rem;
-  border-color: rgba(0, 122, 255, 0.18);
-}
-
-.kg-splash-monogram-wrap {
-  position: relative;
-}
-
-.kg-splash-monogram-shine {
-  position: absolute;
-  inset: -20% -30%;
-  background: linear-gradient(
-    105deg,
-    transparent 35%,
-    rgba(255, 255, 255, 0.55) 50%,
-    transparent 65%
-  );
-  transform: translateX(-120%) skewX(-12deg);
-  mix-blend-mode: overlay;
-  pointer-events: none;
-}
-
-.kg-splash-root-launch .kg-splash-monogram-shine {
-  animation: kg-splash-monogram-shine 0.9s ease-in-out 0.55s both;
-}
-
-.kg-splash-monogram {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-  filter: drop-shadow(0 14px 34px rgba(88, 86, 214, 0.45));
-}
-
-/* Rings mark inside the splash — sized off the viewport like the old wordmark was. */
-.kg-splash-rings {
-  width: clamp(7rem, 34vw, 10.5rem);
-  height: auto;
-}
-
-.kg-splash-root-route .kg-splash-rings {
-  width: clamp(4.5rem, 21vw, 6.5rem);
-}
-
-.kg-splash-root-return .kg-splash-rings {
-  width: clamp(5.5rem, 25vw, 7.5rem);
-}
-
-.kg-splash-monogram-letter {
-  background: linear-gradient(135deg, #007aff 0%, #5856d6 45%, #af52de 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
-.kg-splash-root-launch .kg-splash-monogram {
-  animation: kg-splash-g-bump 1.35s cubic-bezier(0.18, 0.95, 0.22, 1) 0.08s both;
-}
-
-.kg-splash-root-launch .kg-splash-burst {
-  animation: kg-splash-burst 1.35s ease-out 0.12s both;
-}
-
-.kg-splash-root-launch .kg-splash-burst-2 {
-  animation: kg-splash-burst 1.55s ease-out 0.22s both;
-}
-
-.kg-splash-root-launch .kg-splash-ring-1 {
-  animation: kg-splash-ring 1.45s ease-out 0.18s both;
-}
-
-.kg-splash-root-launch .kg-splash-ring-2 {
-  animation: kg-splash-ring 1.6s ease-out 0.28s both;
-}
-
-.kg-splash-root-launch .kg-splash-ring-3 {
-  animation: kg-splash-ring 1.75s ease-out 0.38s both;
-}
-
-.kg-splash-root-route .kg-splash-monogram {
-  animation: kg-splash-route-g 0.78s cubic-bezier(0.34, 1.3, 0.64, 1) both;
-}
-
-.kg-splash-root-route .kg-splash-burst,
-.kg-splash-root-route .kg-splash-ring,
-.kg-splash-root-route .kg-splash-sweep,
-.kg-splash-root-route .kg-splash-mesh {
-  display: none;
-}
-
-.kg-splash-root-return .kg-splash-monogram {
-  animation: kg-splash-route-g 0.9s cubic-bezier(0.34, 1.2, 0.64, 1) both;
-}
-
-.kg-splash-root-return .kg-splash-burst {
-  animation: kg-splash-burst 1.1s ease-out 0.08s both;
-}
-
-.kg-splash-root-return .kg-splash-ring-1 {
-  animation: kg-splash-ring 1.05s ease-out 0.12s both;
-}
-
-.kg-splash-root-return .kg-splash-ring-2 {
-  animation: kg-splash-ring 1.15s ease-out 0.2s both;
-}
-
-.kg-splash-wordmark {
-  margin-top: 1.5rem;
-  text-align: center;
-  animation: kg-splash-wordmark-in 0.6s ease-out 1.05s both;
-}
-
-.kg-splash-brand {
-  display: flex;
-  align-items: baseline;
-  justify-content: center;
-  gap: 0.45rem;
-  font-size: clamp(1.4rem, 5vw, 2rem);
-  font-weight: 700;
-  letter-spacing: -0.03em;
-}
-
-.kg-splash-brand-letter {
-  display: inline-block;
-  background: linear-gradient(135deg, #007aff, #5856d6, #af52de);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: kg-splash-letter-pop 0.5s cubic-bezier(0.16, 1, 0.3, 1) backwards;
-}
-
-.kg-splash-brand-finance {
-  font-size: 0.78em;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.kg-splash-tagline {
-  margin-top: 0.55rem;
-  font-size: 0.86rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
-  animation: kg-splash-tagline-in 0.55s ease-out 1.45s both;
-}
-
-.kg-splash-name-owner {
-  color: #007aff;
-  font-weight: 600;
-}
-
-.kg-splash-name-member {
-  color: #af52de;
-  font-weight: 600;
-}
-
-.kg-splash-amp {
-  color: rgba(255, 255, 255, 0.45);
-}
-
-.kg-splash-return-copy {
-  margin-top: 1.1rem;
-  text-align: center;
-}
-
-.kg-splash-welcome {
-  font-size: 1.05rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: rgba(255, 255, 255, 0.92);
-  animation: kg-splash-tagline-in 0.5s ease-out 0.42s both;
-}
-
-.kg-splash-return-sub {
-  margin-top: 0.35rem;
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.45);
-  animation: kg-splash-tagline-in 0.5s ease-out 0.62s both;
-}
-
-@keyframes kg-splash-scrim-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes kg-splash-scrim-out {
-  to { opacity: 0; }
-}
-
-/* Whole splash lifts away together — backdrop, mesh and mark. */
-@keyframes kg-splash-exit {
-  from {
-    opacity: 1;
-    transform: scale(1);
-    filter: blur(0);
-  }
-  to {
-    opacity: 0;
-    transform: scale(1.09);
-    filter: blur(3px);
-  }
-}
-
-@keyframes kg-splash-mesh-pulse {
-  0% { opacity: 0; transform: scale(0.95); }
-  35% { opacity: 1; }
-  100% { opacity: 0.75; transform: scale(1.03); }
-}
-
-@keyframes kg-splash-route-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes kg-splash-route-out {
-  to { opacity: 0; }
-}
-
-@keyframes kg-splash-g-bump {
-  0% {
-    opacity: 0;
-    transform: scale(0.08) rotate(-8deg);
-  }
-  42% {
-    opacity: 1;
-    transform: scale(1.16) rotate(2deg);
-  }
-  62% {
-    transform: scale(0.94) rotate(-1deg);
-  }
-  82% {
-    transform: scale(1.04) rotate(0deg);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1) rotate(0deg);
-  }
-}
-
-@keyframes kg-splash-route-g {
-  0% {
-    opacity: 0;
-    transform: scale(0.5);
-  }
-  55% {
-    opacity: 1;
-    transform: scale(1.1);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-@keyframes kg-splash-burst {
-  0% {
-    opacity: 0;
-    transform: scale(0.15);
-  }
-  35% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-    transform: scale(2.6);
-  }
-}
-
-@keyframes kg-splash-ring {
-  0% {
-    opacity: 0;
-    transform: scale(0.35);
-  }
-  30% {
-    opacity: 0.6;
-  }
-  100% {
-    opacity: 0;
-    transform: scale(1.9);
-  }
-}
-
-@keyframes kg-splash-sweep {
-  0% {
-    opacity: 0;
-    left: -120%;
-  }
-  20% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-    left: 140%;
-  }
-}
-
-@keyframes kg-splash-monogram-shine {
-  0% {
-    transform: translateX(-120%) skewX(-12deg);
-    opacity: 0;
-  }
-  35% {
-    opacity: 1;
-  }
-  100% {
-    transform: translateX(120%) skewX(-12deg);
-    opacity: 0;
-  }
-}
-
-@keyframes kg-splash-particle-rise {
-  0% {
-    opacity: 0;
-    transform: translateY(0) scale(0.4);
-  }
-  15% {
-    opacity: 0.85;
-  }
-  100% {
-    opacity: 0;
-    transform: translateY(-55vh) scale(1);
-  }
-}
-
-@keyframes kg-splash-wordmark-in {
-  from {
-    opacity: 0;
-    transform: translateY(14px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes kg-splash-letter-pop {
-  from {
-    opacity: 0;
-    transform: translateY(12px) scale(0.75);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-@keyframes kg-splash-tagline-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 .bottom-nav-shell {
@@ -772,7 +440,7 @@ body.kg-splash-active {
 }
 
 .bottom-nav-fab {
-  background: linear-gradient(145deg, #007aff 0%, #5856d6 55%, #af52de 100%);
+  background: linear-gradient(145deg, var(--accent) 0%, var(--accent-secondary) 55%, var(--feature) 100%);
   box-shadow:
     0 10px 24px rgba(0, 122, 255, 0.35),
     0 2px 8px rgba(88, 86, 214, 0.25);
@@ -802,48 +470,12 @@ body.kg-splash-active {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .kg-gradient-text,
-  .kg-finance-text,
   .kg-glow,
-  .kg-letter,
+  .kg-lion-glow,
+  .kg-wordmark-letter,
   .kg-subtitle,
-  .kg-amp,
-  .kg-splash-root,
-  .kg-splash-scrim,
-  .kg-splash-mesh,
-  .kg-splash-monogram,
-  .kg-splash-monogram-shine,
-  .kg-splash-burst,
-  .kg-splash-ring,
-  .kg-splash-sweep,
-  .kg-splash-particle,
-  .kg-splash-wordmark,
-  .kg-splash-brand-letter,
-  .kg-splash-tagline,
-  .kg-splash-welcome,
-  .kg-splash-return-sub {
+  .kg-amp {
     animation: none !important;
-  }
-
-  /* Fade the whole splash, so the mark can't outlive its backdrop. */
-  .kg-splash-root-launch {
-    animation: kg-splash-scrim-out 0.2s ease-in 0.35s forwards !important;
-  }
-
-  .kg-splash-root-route,
-  .kg-splash-root-return {
-    animation: kg-splash-route-out 0.2s ease-in 0.25s forwards !important;
-  }
-
-  .kg-splash-root-launch .kg-splash-scrim,
-  .kg-splash-root-route .kg-splash-scrim,
-  .kg-splash-root-return .kg-splash-scrim {
-    animation: none !important;
-  }
-
-  .kg-letter {
-    opacity: 1;
-    transform: none;
   }
 }
 
@@ -951,7 +583,7 @@ input[type="number"] {
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #af52de;
+  color: var(--feature);
   margin-bottom: 0.35rem;
 }
 
@@ -960,7 +592,7 @@ input[type="number"] {
   font-weight: 700;
   line-height: 1.2;
   margin-bottom: 0.5rem;
-  background: linear-gradient(135deg, #007aff, #5856d6, #af52de);
+  background: linear-gradient(135deg, var(--accent), var(--accent-secondary), var(--feature));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -982,7 +614,7 @@ input[type="number"] {
   border-radius: 999px;
   background: rgba(175, 82, 222, 0.1);
   border: 1px solid rgba(175, 82, 222, 0.18);
-  color: #af52de;
+  color: var(--feature);
   animation: balance-balance-glow 1.8s ease-in-out infinite;
 }
 
@@ -1126,7 +758,7 @@ input[type="number"] {
   width: 8px;
   height: 8px;
   border-radius: 9999px;
-  background: #34c759;
+  background: var(--success);
   animation: assistant-live-blink 1.8s ease-in-out infinite;
 }
 
@@ -1240,13 +872,13 @@ input[type="number"] {
 
 .assistant-gemini-orb-wrap {
   --orb-size: 168px;
-  --orb-periwinkle: #7b8cff;
-  --orb-lavender: #a8b4ff;
-  --orb-cyan: #5ac8fa;
-  --orb-pink: #c084fc;
-  --orb-blue: #007aff;
-  --orb-white: #f8faff;
-  --orb-deep: #4f5fd0;
+  --orb-periwinkle: #4a8dfc;
+  --orb-lavender: #9fc8fe;
+  --orb-cyan: #6cc6ff;
+  --orb-pink: #a78bfa;
+  --orb-blue: var(--accent);
+  --orb-white: #f4f8ff;
+  --orb-deep: #0b2cb1;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1447,36 +1079,36 @@ input[type="number"] {
 
 /* State tints — richer color while active */
 .assistant-gemini-orb-wrap[data-state="listening"] {
-  --orb-periwinkle: #6e7fff;
-  --orb-lavender: #9db0ff;
-  --orb-cyan: #4dd4ff;
-  --orb-pink: #d08cff;
-  --orb-deep: #4556c8;
+  --orb-periwinkle: #3781fc;
+  --orb-lavender: #8fbcfe;
+  --orb-cyan: #7cc8ff;
+  --orb-pink: #c3b2ff;
+  --orb-deep: #03195b;
 }
 
 .assistant-gemini-orb-wrap[data-state="speaking"] {
-  --orb-periwinkle: #8b6cff;
-  --orb-lavender: #b898ff;
-  --orb-cyan: #66d4ff;
-  --orb-pink: #e090ff;
-  --orb-blue: #5856d6;
-  --orb-deep: #5a4fc8;
+  --orb-periwinkle: #6f9dff;
+  --orb-lavender: #aed4fe;
+  --orb-cyan: #8fd0ff;
+  --orb-pink: #cfc2ff;
+  --orb-blue: var(--accent-secondary);
+  --orb-deep: #1240d8;
 }
 
 .assistant-gemini-orb-wrap[data-state="thinking"] {
-  --orb-periwinkle: #9a8cff;
-  --orb-lavender: #c0b4ff;
-  --orb-cyan: #7ad8ff;
-  --orb-pink: #c998ff;
-  --orb-deep: #6a62d0;
+  --orb-periwinkle: #7fb0fd;
+  --orb-lavender: #bcdefd;
+  --orb-cyan: #a8deff;
+  --orb-pink: #b49cff;
+  --orb-deep: #2a63fc;
 }
 
 .assistant-gemini-orb-wrap[data-state="connecting"] {
-  --orb-periwinkle: #88a0ff;
-  --orb-lavender: #b8c8ff;
-  --orb-cyan: #6fd0ff;
-  --orb-pink: #c8a0ff;
-  --orb-deep: #6878d8;
+  --orb-periwinkle: #5f9cfd;
+  --orb-lavender: #cbe9fd;
+  --orb-cyan: #9bd8ff;
+  --orb-pink: #bba6ff;
+  --orb-deep: #1951fc;
 }
 
 .assistant-gemini-orb-wrap[data-state="idle"] .assistant-gemini-orb-scene {
@@ -1599,7 +1231,7 @@ input[type="number"] {
 
 @media (prefers-color-scheme: light) {
   .assistant-live-orb-stage {
-    background: linear-gradient(180deg, #0a0a12 0%, #12121c 100%);
+    background: linear-gradient(180deg, #02040c 0%, #03195b 100%);
   }
 }
 
@@ -1653,13 +1285,13 @@ input[type="number"] {
 
 /* A layer that failed — its wires stay dark and dead */
 .nn-edge-dead {
-  stroke: #ff4d6d;
+  stroke: var(--danger);
   opacity: 0.12;
 }
 
 /* ---- travelling signal ---- */
 .nn-particle {
-  fill: #b9f6ff;
+  fill: #e2f3ff;
   filter: url(#nnGlow);
 }
 
@@ -1671,42 +1303,42 @@ input[type="number"] {
 }
 
 .nn-node-live {
-  fill: #00e5ff;
+  fill: var(--accent-cyan);
   opacity: 1;
   filter: url(#nnGlow);
 }
 
 /* Layer is still thinking */
 .nn-node-pending {
-  fill: var(--tint, #00e5ff);
+  fill: var(--tint, var(--accent-cyan));
   opacity: 1;
   filter: url(#nnGlow);
   animation: nn-throb 1.15s ease-in-out infinite;
 }
 
 .nn-node-live-merge {
-  fill: #c084fc;
+  fill: #a78bfa;
   opacity: 1;
   filter: url(#nnGlow);
   animation: nn-throb 1.35s ease-in-out infinite;
 }
 
 .nn-node-out {
-  fill: #39ff88;
+  fill: var(--success);
   opacity: 1;
   filter: url(#nnGlow);
 }
 
 /* Layer produced a usable answer */
 .nn-node-answered {
-  fill: #39ff88;
+  fill: var(--success);
   opacity: 1;
   filter: url(#nnGlowSoft);
 }
 
 /* Layer errored, timed out, or has no key */
 .nn-node-failed {
-  fill: #ff4d6d;
+  fill: var(--danger);
   opacity: 0.5;
 }
 
@@ -1723,15 +1355,15 @@ input[type="number"] {
 }
 
 .nn-halo-in {
-  stroke: #00e5ff;
+  stroke: var(--accent-cyan);
 }
 
 .nn-halo-out {
-  stroke: #39ff88;
+  stroke: var(--success);
 }
 
 .nn-halo-tint {
-  stroke: var(--tint, #00e5ff);
+  stroke: var(--tint, var(--accent-cyan));
 }
 
 .nn-axis {
@@ -1777,7 +1409,7 @@ input[type="number"] {
 }
 
 .nn-chip-pending {
-  color: var(--tint, #00e5ff);
+  color: var(--tint, var(--accent-cyan));
   opacity: 1;
   text-shadow: 0 0 8px currentColor;
   animation: nn-throb 1.15s ease-in-out infinite;
@@ -1788,12 +1420,12 @@ input[type="number"] {
 }
 
 .nn-chip-answered {
-  color: #39ff88;
+  color: var(--success);
   opacity: 1;
 }
 
 .nn-chip-failed {
-  color: #ff4d6d;
+  color: var(--danger);
   opacity: 0.6;
   text-decoration: line-through;
 }
@@ -2051,7 +1683,7 @@ input[type="number"] {
 }
 
 .focus-ring:focus-visible {
-  outline: 2px solid #007aff;
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: 10px;
 }
@@ -2091,7 +1723,7 @@ input[type="number"] {
 }
 
 .assistant-voice-bubble-user {
-  background: linear-gradient(135deg, #007aff 0%, #5856d6 100%);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 100%);
   color: #fff;
   box-shadow: 0 4px 14px rgba(0, 122, 255, 0.25);
 }
@@ -2141,7 +1773,7 @@ input[type="number"] {
 }
 
 .nn-edge-live-free {
-  stroke: #39ff88;
+  stroke: var(--success);
   stroke-width: 1.1;
   opacity: 0.7;
   stroke-dasharray: 3 8;
@@ -2150,7 +1782,7 @@ input[type="number"] {
 }
 
 .nn-particle-free {
-  fill: #9dffc8;
+  fill: var(--success);
 }
 
 /* A layer that was deliberately not called — dimmed, never red. */
@@ -2175,14 +1807,14 @@ input[type="number"] {
 }
 
 .nn-gate-live {
-  fill: #c084fc;
+  fill: #a78bfa;
   opacity: 0.9;
   filter: url(#nnGlowSoft);
 }
 
 /* Base .nn-halo already supplies the nn-ring animation — only the colour differs. */
 .nn-halo-gate {
-  stroke: #c084fc;
+  stroke: #a78bfa;
 }
 
 /* free / paid badge on each legend chip */
@@ -2199,17 +1831,17 @@ input[type="number"] {
 
 .nn-tag-free {
   background: rgba(57, 255, 136, 0.16);
-  color: #39ff88;
+  color: var(--success);
 }
 
 .nn-tag-paid {
   background: rgba(255, 157, 92, 0.16);
-  color: #ff9d5c;
+  color: var(--warning);
 }
 
 /* Caption when the turn cost nothing */
 .nn-caption-saved {
-  color: #39ff88;
+  color: var(--success);
   opacity: 0.85;
 }
 
@@ -2357,7 +1989,7 @@ input[type="number"] {
 }
 
 .vp-node-live i {
-  background: #7fe4ff;
+  background: #d5ecfe;
 }
 
 /* Waiting on the socket — pulse rather than sit lit. */
@@ -2393,7 +2025,7 @@ input[type="number"] {
 }
 
 .vp-wire-live {
-  background: linear-gradient(90deg, rgba(77, 208, 255, 0.15), #4dd0ff, rgba(77, 208, 255, 0.15));
+  background: linear-gradient(90deg, rgba(77, 208, 255, 0.15), #6cc6ff, rgba(77, 208, 255, 0.15));
   background-size: 220% 100%;
   animation: vp-flow 1.1s linear infinite;
 }
@@ -2478,4 +2110,161 @@ input[type="number"] {
   transform: translate(-50%, -50%);
   width: max(100% + 12px, 36px);
   height: max(100% + 12px, 36px);
+}
+
+/* ---------------------------------------------------------------------
+   The dashboard mark: the last sixteen days, as a grid.
+
+   One cell per day, oldest top-left to today bottom-right, each lit by what
+   was spent that day against the worst day in the window. It is a calendar
+   heatmap shrunk to 36px: too small to read a figure from, exactly the right
+   size to see a pattern — a quiet fortnight, a bad weekend, a day that ate
+   the month.
+
+   Brightness alone never carries the meaning: the whole grid has a label
+   naming the busiest day and its amount, so it is legible to a screen reader
+   and to anyone who cannot separate the steps by eye.
+   --------------------------------------------------------------------- */
+.kg-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-auto-rows: 1fr;
+  gap: 11%;
+  flex: none;
+}
+
+.kg-grid-cell {
+  border-radius: 1.5px;
+  background: var(--accent);
+  animation: kg-grid-in 0.42s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+@keyframes kg-grid-in {
+  from { opacity: 0; transform: scale(0.4); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The pattern is the point; the sweep that reveals it is not. */
+  .kg-grid-cell { animation: none; }
+}
+
+/* ------------------------------------------------------------------ */
+/* Assistant workspace — one dark world, whatever the phone's theme    */
+/* ------------------------------------------------------------------ */
+
+/*
+ * The assistant's money map is one lit-from-within dark scene, like the front
+ * door: luminous lines only read on near-black. Every token is redefined
+ * here so the app's own pieces placed inside (voice panel, confirm card,
+ * naming) turn dark with it — the colour utilities are `@theme inline`, so
+ * they follow these variables down the tree.
+ */
+.kg-dark-world {
+  color-scheme: dark;
+  --background: #020404;
+  --foreground: #e3e8eb;
+  --glass-bg: rgba(20, 32, 31, 0.6);
+  --glass-border: rgba(156, 163, 163, 0.18);
+  --glass-shadow: 0 14px 36px rgba(0, 0, 0, 0.55);
+  --glass-sheen: rgba(227, 232, 235, 0.1);
+  --glass-tint: transparent;
+  --muted: rgba(227, 232, 235, 0.58);
+  --accent: #3781fc;
+  --accent-secondary: #6f9dff;
+  --success: #2fe08a;
+  --warning: #ffb020;
+  --danger: #ff5d73;
+  --feature: #a78bfa;
+  --accent-cyan: #6cc6ff;
+  --amber: #ffc44d;
+  --neutral: #9ab3d6;
+  --lion: #cbe9fd;
+  --wordmark: #e8f1ff;
+  --modal-surface: #0d1716;
+
+  /* The workspace's own light: gold for what is chosen, teal for what flows. */
+  --ws-gold: #d9b26f;
+  --ws-teal: #5ad1c0;
+  --ws-orb: #9b8cff;
+  --ws-good: #2fe08a;
+  --ws-warn: #ffb020;
+  --ws-bad: #ff5d73;
+  --ws-neutral: #9ca3a3;
+  --ws-panel: rgba(13, 22, 21, 0.78);
+  --ws-edge: rgba(156, 163, 163, 0.16);
+
+  background:
+    radial-gradient(70% 60% at 38% 50%, rgba(36, 66, 62, 0.42), transparent 70%),
+    radial-gradient(40% 40% at 85% 15%, rgba(155, 140, 255, 0.08), transparent 70%),
+    #020404;
+  color: var(--foreground);
+}
+
+.ws-panel {
+  background: var(--ws-panel);
+  border: 1px solid var(--ws-edge);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+}
+
+.ws-tile {
+  background: rgba(227, 232, 235, 0.035);
+  border: 1px solid var(--ws-edge);
+}
+
+.ws-spin {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ws-spin 48s linear infinite;
+}
+.ws-spin-reverse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ws-spin 64s linear infinite reverse;
+}
+.ws-breathe {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ws-breathe 4.2s ease-in-out infinite;
+}
+.ws-twinkle {
+  animation: ws-twinkle 3.6s ease-in-out infinite;
+}
+.ws-flow {
+  stroke-dasharray: 4 8;
+  animation: ws-flow 1.1s linear infinite;
+}
+.ws-ping {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ws-ping 1.8s ease-out infinite;
+}
+.ws-shimmer {
+  background: linear-gradient(90deg, transparent, rgba(217, 178, 111, 0.35), transparent);
+  background-size: 200% 100%;
+  animation: ws-shimmer 1.6s linear infinite;
+}
+
+@keyframes ws-spin { to { transform: rotate(360deg); } }
+@keyframes ws-breathe {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50% { opacity: 0.95; transform: scale(1.07); }
+}
+@keyframes ws-twinkle {
+  0%, 100% { opacity: 0.12; }
+  50% { opacity: 0.7; }
+}
+@keyframes ws-flow { to { stroke-dashoffset: -24; } }
+@keyframes ws-ping {
+  0% { transform: scale(0.7); opacity: 0.9; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+@keyframes ws-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The map still says everything standing still; only the drift goes. */
+  .ws-spin, .ws-spin-reverse, .ws-breathe, .ws-twinkle, .ws-flow, .ws-ping, .ws-shimmer { animation: none; }
 }

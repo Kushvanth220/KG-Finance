@@ -15,9 +15,9 @@ import { BankCardFace } from "@/components/art/page-art";
  */
 
 const CARDS = [
-  { key: "checking", label: "Checking", amount: 1420, sub: "Bank of Somewhere · 4821", tint: "#1f6fd6", icon: <Landmark className="h-5 w-5" /> },
-  { key: "savings", label: "Savings", amount: 640, sub: "Growing since March", tint: "#4b3fc9", icon: <PiggyBank className="h-5 w-5" /> },
-  { key: "credit", label: "Credit card", amount: 759.13, sub: "Owed · due the 3rd", tint: "#c9302c", icon: <CreditCard className="h-5 w-5" /> },
+  { key: "checking", label: "Checking", amount: 1420, sub: "Bank of Somewhere · 4821", tint: "#0b2cb1", icon: <Landmark className="h-5 w-5" /> },
+  { key: "savings", label: "Savings", amount: 640, sub: "Growing since March", tint: "#1240d8", icon: <PiggyBank className="h-5 w-5" /> },
+  { key: "credit", label: "Credit card", amount: 759.13, sub: "Owed · due the 3rd", tint: "#b3303f", icon: <CreditCard className="h-5 w-5" /> },
 ];
 
 /** Where a card sits given how far behind the front it is. */

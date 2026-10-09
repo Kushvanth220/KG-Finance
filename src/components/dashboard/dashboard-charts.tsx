@@ -16,9 +16,12 @@ import {
 import { formatCurrency } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 
-const INCOME_COLOR = "#34c759";
-const SPEND_COLOR = "#ff3b30";
-const LEFT_COLOR = "#007aff";
+/** One tempo for every mark: fast enough to feel instant, slow enough to read. */
+const CHART_MS = 700;
+
+const INCOME_COLOR = "var(--success)";
+const SPEND_COLOR = "var(--danger)";
+const LEFT_COLOR = "var(--accent)";
 
 export type TrendPoint = {
   key: string;
@@ -144,7 +147,7 @@ export function IncomeVsSpendChart({
               />
             )}
           />
-          <Bar
+          <Bar animationDuration={CHART_MS} animationEasing="ease-out"
             dataKey="income"
             name="income"
             fill={INCOME_COLOR}
@@ -157,7 +160,7 @@ export function IncomeVsSpendChart({
             }}
             opacity={activeKey ? 0.45 : 1}
           />
-          <Bar
+          <Bar animationDuration={CHART_MS} animationEasing="ease-out"
             dataKey="spend"
             name="spend"
             fill={SPEND_COLOR}
@@ -184,18 +187,18 @@ export function IncomeVsSpendChart({
 }
 
 export const INCOME_SOURCE_PALETTE = [
-  "#34c759",
-  "#30d158",
-  "#007aff",
-  "#5856d6",
-  "#ff9500",
-  "#64d2ff",
-  "#af52de",
-  "#ff2d55",
-  "#ffd60a",
-  "#5ac8fa",
-  "#bf5af2",
-  "#ac8e68",
+  "var(--success)",
+  "var(--chart-moss)",
+  "var(--accent)",
+  "var(--accent-secondary)",
+  "var(--warning)",
+  "var(--chart-sky)",
+  "var(--feature)",
+  "var(--pink)",
+  "var(--amber)",
+  "var(--accent-cyan)",
+  "#a78bfa",
+  "#6f7fa8",
 ];
 
 export function getIncomeSourceColor(index: number): string {
@@ -234,7 +237,7 @@ export function IncomeDonutChart({
       <div className="relative h-[160px]">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
-            <Pie
+            <Pie animationDuration={CHART_MS} animationEasing="ease-out"
               data={chartData}
               dataKey="value"
               nameKey="name"
@@ -292,20 +295,20 @@ export function IncomeDonutChart({
 }
 
 export const EXPENSE_CATEGORY_PALETTE = [
-  "#ff3b30",
-  "#ff9500",
-  "#ffcc00",
-  "#34c759",
-  "#30d158",
-  "#007aff",
-  "#5856d6",
-  "#af52de",
-  "#ff2d55",
-  "#64d2ff",
-  "#ac8e68",
-  "#5ac8fa",
-  "#bf5af2",
-  "#ffd60a",
+  "var(--danger)",
+  "var(--warning)",
+  "var(--chart-gold)",
+  "var(--success)",
+  "var(--chart-moss)",
+  "var(--accent)",
+  "var(--accent-secondary)",
+  "var(--feature)",
+  "var(--pink)",
+  "var(--chart-sky)",
+  "#6f7fa8",
+  "var(--accent-cyan)",
+  "#a78bfa",
+  "var(--amber)",
 ];
 
 export function getExpenseCategoryColor(index: number): string {
@@ -346,7 +349,7 @@ export function ExpenseCategoryDonutChart({
       <div className="relative h-[160px]">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
-            <Pie
+            <Pie animationDuration={CHART_MS} animationEasing="ease-out"
               data={chartData}
               dataKey="value"
               nameKey="name"
@@ -455,7 +458,7 @@ export function LeftTrendChart({
               />
             )}
           />
-          <Area
+          <Area animationDuration={CHART_MS} animationEasing="ease-out"
             type="monotone"
             dataKey="left"
             stroke={LEFT_COLOR}

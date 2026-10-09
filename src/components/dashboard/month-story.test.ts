@@ -3,9 +3,10 @@ import { paceFor, storyFor } from "./month-story";
 
 describe("storyFor", () => {
   it("goes green, amber, red as spending climbs against income", () => {
-    expect(storyFor(1000, 500).color).toBe("#34c759");
-    expect(storyFor(1000, 900).color).toBe("#ff9500");
-    expect(storyFor(1000, 1220).color).toBe("#ff3b30");
+    // Roles, not hexes: the dial follows the theme wherever it is re-pointed.
+    expect(storyFor(1000, 500).color).toBe("var(--success)");
+    expect(storyFor(1000, 900).color).toBe("var(--warning)");
+    expect(storyFor(1000, 1220).color).toBe("var(--danger)");
   });
 
   it("says the one thing that matters", () => {

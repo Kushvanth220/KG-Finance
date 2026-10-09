@@ -36,9 +36,11 @@ interface AnimatedMoneyProps {
   className?: string;
   /** Rendered before the amount, e.g. "+". */
   prefix?: string;
+  /** For amounts that are not dollars (₹, ₱). Dollars by default. */
+  format?: (value: number) => string;
 }
 
-export function AnimatedMoney({ value, className, prefix }: AnimatedMoneyProps) {
+export function AnimatedMoney({ value, className, prefix, format = formatCurrency }: AnimatedMoneyProps) {
   // Start settled so the server render and the first client paint agree.
   const [shown, setShown] = useState(value);
   /** Always the value currently on screen — the tween's real starting point. */
@@ -92,7 +94,7 @@ export function AnimatedMoney({ value, className, prefix }: AnimatedMoneyProps) 
   return (
     <span className={className} suppressHydrationWarning>
       {prefix}
-      {formatCurrency(shown)}
+      {format(shown)}
     </span>
   );
 }

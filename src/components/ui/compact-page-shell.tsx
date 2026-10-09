@@ -3,6 +3,7 @@
 import { Children } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { PersonTabs } from "@/components/ui/person-tabs";
+import { DURATION, EASE } from "@/lib/motion-presets";
 import { cn } from "@/lib/utils";
 import type { Person } from "@/types";
 
@@ -13,11 +14,10 @@ type PersonFilter = Person | "overall";
  * the page never looks empty while the cards arrive; on a slow phone that gap
  * is the difference between "loading" and "broken".
  */
-const EASE = [0.16, 1, 0.3, 1] as const;
-const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.05 } } };
+const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.045 } } };
 const rise = {
-  hidden: { opacity: 0, y: 12 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: EASE } },
+  hidden: { opacity: 0, y: 10 },
+  show: { opacity: 1, y: 0, transition: { duration: DURATION.slow, ease: EASE } },
 };
 
 type CompactPageShellProps = {

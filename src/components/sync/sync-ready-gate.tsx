@@ -1,12 +1,15 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { contentHeld, subscribeLaunch } from "@/components/brand/launch-state";
 import { isSupabaseConfiguredAsync } from "@/lib/supabase/client";
 import { waitForStoreHydration } from "@/store/finance-store";
 
 export function SyncReadyGate({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
+  // While the lion forms on the launch screen, the page waits underneath it.
+  const held = useSyncExternalStore(subscribeLaunch, contentHeld, () => false);
 
   useEffect(() => {
     let cancelled = false;
@@ -30,10 +33,10 @@ export function SyncReadyGate({ children }: { children: React.ReactNode }) {
     void isSupabaseConfiguredAsync();
   }, []);
 
-  if (!ready) {
+  if (!ready || held) {
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 px-6 text-center">
-        <Loader2 className="h-6 w-6 animate-spin text-[#007aff]" />
+        <Loader2 className="h-6 w-6 animate-spin text-accent" />
         <p className="text-sm font-medium">Loading your finances…</p>
       </div>
     );

@@ -66,7 +66,7 @@ export function BillEditor({
             onChange={(event) => setName(event.target.value)}
             placeholder="T-Mobile, Room Rent, Car insurance…"
             autoFocus
-            className="mt-1 w-full glass rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#007aff]/40"
+            className="mt-1 w-full glass-field rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent/40"
           />
         </div>
 
@@ -81,7 +81,7 @@ export function BillEditor({
                 className={cn(
                   "flex-1 rounded-xl px-3 py-2 text-xs font-semibold transition-colors",
                   person === who
-                    ? "bg-[#007aff] text-white"
+                    ? "glass-pill"
                     : "glass text-muted hover:text-foreground"
                 )}
               >
@@ -100,14 +100,14 @@ export function BillEditor({
               disabled={isVariable}
               inputMode="decimal"
               placeholder={isVariable ? "Changes each month" : "0.00"}
-              className="flex-1 glass rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#007aff]/40 disabled:opacity-45"
+              className="flex-1 glass rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent/40 disabled:opacity-45"
             />
             <button
               type="button"
               onClick={() => setIsVariable((v) => !v)}
               className={cn(
                 "rounded-xl px-3 py-2 text-xs font-semibold transition-colors",
-                isVariable ? "bg-[#ff9500] text-white" : "glass text-muted"
+                isVariable ? "bg-caution text-white" : "glass text-muted"
               )}
             >
               Varies
@@ -122,7 +122,7 @@ export function BillEditor({
             onChange={(event) =>
               setDueDay(event.target.value === "" ? "" : Number(event.target.value))
             }
-            className="mt-1 w-full glass rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#007aff]/40"
+            className="mt-1 w-full glass-field rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent/40"
           >
             <option value="">No fixed day</option>
             {DAYS.map((day) => (
@@ -147,7 +147,7 @@ export function BillEditor({
           <span
             className={cn(
               "h-5 w-9 shrink-0 rounded-full p-0.5 transition-colors",
-              isRecurring ? "bg-[#34c759]" : "bg-black/15 dark:bg-white/20"
+              isRecurring ? "bg-positive" : "bg-black/15 dark:bg-white/20"
             )}
           >
             <span

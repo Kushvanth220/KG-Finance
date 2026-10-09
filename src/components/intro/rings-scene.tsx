@@ -22,10 +22,10 @@ const RING_RADIUS = 1.3;
 const TUBE = 0.24;
 const OFFSET = 0.95;
 
-const LEFT_A = new THREE.Color("#0A84FF");
-const LEFT_B = new THREE.Color("#5E5CE6");
-const RIGHT_A = new THREE.Color("#7F5AF0");
-const RIGHT_B = new THREE.Color("#C74FE6");
+const LEFT_A = new THREE.Color("var(--accent)");
+const LEFT_B = new THREE.Color("#3781fc");
+const RIGHT_A = new THREE.Color("#a78bfa");
+const RIGHT_B = new THREE.Color("#b49cff");
 
 /** Colour each vertex by its angle around the ring, so the gradient wraps. */
 function ringGeometry(from: THREE.Color, to: THREE.Color): THREE.TorusGeometry {
@@ -67,7 +67,7 @@ function glowTexture(): THREE.Texture {
 function particles(count: number): THREE.Points {
   const positions = new Float32Array(count * 3);
   const colors = new Float32Array(count * 3);
-  const palette = [new THREE.Color("#007aff"), new THREE.Color("#af52de"), new THREE.Color("#ffffff")];
+  const palette = [new THREE.Color("var(--accent)"), new THREE.Color("var(--feature)"), new THREE.Color("#ffffff")];
   for (let i = 0; i < count; i++) {
     // A shell around the rings, never inside them.
     const r = 3.5 + Math.random() * 5.5;
@@ -136,10 +136,10 @@ export function RingsScene({ className }: { className?: string }) {
         emissiveIntensity: 0.28,
       });
 
-    const left = new THREE.Mesh(ringGeometry(LEFT_A, LEFT_B), material("#1f4fd6"));
+    const left = new THREE.Mesh(ringGeometry(LEFT_A, LEFT_B), material("#03195b"));
     left.position.x = -OFFSET;
 
-    const right = new THREE.Mesh(ringGeometry(RIGHT_A, RIGHT_B), material("#7b3fc8"));
+    const right = new THREE.Mesh(ringGeometry(RIGHT_A, RIGHT_B), material("#2a63fc"));
     right.position.x = OFFSET;
     right.rotation.x = Math.PI / 2;
 
@@ -165,7 +165,7 @@ export function RingsScene({ className }: { className?: string }) {
       sprite.scale.setScalar(scale);
       return sprite;
     };
-    scene.add(disc("#007aff", -1.1, 6.5), disc("#af52de", 1.1, 6.5));
+    scene.add(disc("var(--accent)", -1.1, 6.5), disc("var(--feature)", 1.1, 6.5));
 
     // ---- dust ----
     const dust = particles(520);
@@ -180,7 +180,7 @@ export function RingsScene({ className }: { className?: string }) {
     riderGeometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(RIDERS * 3), 3));
     const riderColors = new Float32Array(RIDERS * 3);
     for (let i = 0; i < RIDERS; i++) {
-      const c = i < RIDERS / 2 ? new THREE.Color("#7fc0ff") : new THREE.Color("#e0a0ff");
+      const c = i < RIDERS / 2 ? new THREE.Color("#a8deff") : new THREE.Color("#cfc2ff");
       riderColors[i * 3] = c.r;
       riderColors[i * 3 + 1] = c.g;
       riderColors[i * 3 + 2] = c.b;

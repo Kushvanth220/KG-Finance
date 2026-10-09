@@ -14,9 +14,9 @@ import type { AiUsageSummary } from "@/lib/ai/usage";
  */
 
 const PROVIDER_TINT: Record<string, string> = {
-  gemini: "#34c759",
-  chatgpt: "#5ac8fa",
-  claude: "#af52de",
+  gemini: "var(--success)",
+  chatgpt: "var(--accent-cyan)",
+  claude: "var(--feature)",
 };
 
 function tokens(n: number): string {
@@ -50,7 +50,7 @@ export function AiUsageCard() {
     <GlassCard className="!p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
         <p className="flex items-center gap-1.5 text-xs font-semibold">
-          <Cpu className="h-3.5 w-3.5 text-[#af52de]" /> AI usage{monthLabel ? ` · ${monthLabel}` : ""}
+          <Cpu className="h-3.5 w-3.5 text-feature" /> AI usage{monthLabel ? ` · ${monthLabel}` : ""}
         </p>
         {summary?.available ? (
           <p className="text-[11px] text-muted">
@@ -61,7 +61,7 @@ export function AiUsageCard() {
       </div>
 
       {error ? (
-        <p className="text-[11px] text-[#ff3b30]">{error}</p>
+        <p className="text-[11px] text-negative">{error}</p>
       ) : !summary ? (
         <p className="text-[11px] text-muted">Adding it up…</p>
       ) : !summary.available ? (
@@ -74,7 +74,7 @@ export function AiUsageCard() {
         <div className="space-y-1">
           {summary.lines.map((line) => (
             <div key={`${line.provider}:${line.model}`} className="flex items-center gap-2 text-[11px]">
-              <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: PROVIDER_TINT[line.provider] ?? "#8e8e93" }} />
+              <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: PROVIDER_TINT[line.provider] ?? "var(--neutral)" }} />
               <span className="min-w-0 flex-1 truncate font-mono">{line.model}</span>
               <span className="shrink-0 text-muted tabular-nums">
                 {line.calls}× · {tokens(line.inputTokens)} in / {tokens(line.outputTokens)} out

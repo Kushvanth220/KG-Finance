@@ -63,7 +63,7 @@ export function useChartType(key: string, fallback: FlexChartType) {
 export function ChartTypePicker({
   value,
   onChange,
-  tint = "#007aff",
+  tint = "var(--accent)",
 }: {
   value: FlexChartType;
   onChange: (next: FlexChartType) => void;
@@ -81,9 +81,9 @@ export function ChartTypePicker({
             aria-pressed={active}
             className={cn(
               "shrink-0 rounded-lg px-2 py-1 text-[10px] font-semibold transition-colors",
-              active ? "text-white" : "glass text-muted hover:text-foreground"
+              active ? "glass-pill" : "glass text-muted hover:text-foreground"
             )}
-            style={active ? { background: tint } : undefined}
+            style={active ? ({ "--pill-tint": tint } as React.CSSProperties) : undefined}
           >
             {option.label}
           </button>

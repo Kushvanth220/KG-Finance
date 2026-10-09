@@ -215,7 +215,7 @@ export default function AccountsPage() {
         <button
           type="button"
           onClick={() => setAccountEditor({})}
-          className="inline-flex items-center gap-1 rounded-lg bg-[#007aff] px-2.5 py-1.5 text-[11px] font-semibold text-white"
+          className="inline-flex items-center gap-1 rounded-lg bg-accent px-2.5 py-1.5 text-[11px] font-semibold text-white"
         >
           <Plus className="w-3 h-3" /> Add account
         </button>
@@ -257,17 +257,17 @@ export default function AccountsPage() {
 
       <GlassCard className="!p-3">
         <div className="flex items-center gap-1.5 mb-2">
-          <TrendingUp className="w-3.5 h-3.5 text-[#34c759]" />
+          <TrendingUp className="w-3.5 h-3.5 text-positive" />
           <p className="text-xs font-semibold">Income summary</p>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <p className="text-[10px] text-muted uppercase tracking-wide">This month</p>
-            <p className="text-lg font-bold text-[#34c759] tabular-nums">+{formatCurrency(monthlyIncome)}</p>
+            <p className="text-lg font-bold text-positive tabular-nums">+{formatCurrency(monthlyIncome)}</p>
           </div>
           <div>
             <p className="text-[10px] text-muted uppercase tracking-wide">This week</p>
-            <p className="text-lg font-bold text-[#34c759] tabular-nums">+{formatCurrency(weeklyIncome)}</p>
+            <p className="text-lg font-bold text-positive tabular-nums">+{formatCurrency(weeklyIncome)}</p>
           </div>
         </div>
       </GlassCard>
@@ -278,7 +278,7 @@ export default function AccountsPage() {
           <button
             type="button"
             onClick={() => setShowAddSource(true)}
-            className="text-[10px] text-[#007aff] font-medium"
+            className="text-[10px] text-accent font-medium"
           >
             + Add source
           </button>
@@ -306,7 +306,7 @@ export default function AccountsPage() {
                     className="tap-icon focus-ring p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5"
                     aria-label={`Delete income source ${source.name}`}
                   >
-                    <Trash2 className="w-3.5 h-3.5 text-[#ff3b30]" />
+                    <Trash2 className="w-3.5 h-3.5 text-negative" />
                   </button>
                 </div>
               </div>
@@ -334,7 +334,7 @@ export default function AccountsPage() {
                     <p className="font-semibold flex items-center gap-1.5 flex-wrap">
                       {account.name}
                       {isSharedAccount(account) ? (
-                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-[#af52de]/15 text-[#af52de]">
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-feature/15 text-feature">
                           Shared
                         </span>
                       ) : null}
@@ -388,7 +388,7 @@ export default function AccountsPage() {
                       aria-label={`Delete account ${account.name}`}
                       title={`Delete ${account.name}`}
                     >
-                      <Trash2 className="w-4 h-4 text-[#ff3b30]" />
+                      <Trash2 className="w-4 h-4 text-negative" />
                     </button>
                   </div>
                 </div>
@@ -403,12 +403,12 @@ export default function AccountsPage() {
                   {account.type === "credit" && account.creditLimit != null && (
                     <div className="text-right">
                       <p className="text-xs text-muted">{CREDIT_LABELS.leftToSpend}</p>
-                      <p className="font-semibold text-[#34c759]">
+                      <p className="font-semibold text-positive">
                         {formatCurrency(getAvailableCredit(account))}
                       </p>
                       <div className="mt-2 w-24 h-1.5 rounded-full bg-black/10 dark:bg-white/10 overflow-hidden">
                         <div
-                          className="h-full rounded-full bg-[#007aff] transition-all"
+                          className="h-full rounded-full bg-accent transition-all"
                           style={{
                             width: `${Math.min(100, getCreditUtilization(account))}%`,
                           }}
@@ -451,7 +451,7 @@ export default function AccountsPage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
-                    <span className="text-xs font-semibold text-[#34c759] tabular-nums">
+                    <span className="text-xs font-semibold text-positive tabular-nums">
                       +{formatCurrency(entry.amount)}
                     </span>
                     <button
@@ -459,7 +459,7 @@ export default function AccountsPage() {
                       className="tap-icon focus-ring p-1 rounded-lg hover:bg-black/5"
                       aria-label={`Delete income of ${formatCurrency(entry.amount)}`}
                     >
-                      <Trash2 className="w-3 h-3 text-[#ff3b30]" />
+                      <Trash2 className="w-3 h-3 text-negative" />
                     </button>
                   </div>
                 </div>
@@ -522,7 +522,7 @@ export default function AccountsPage() {
               <button
                 type="button"
                 onClick={() => setShowAddSource(true)}
-                className="text-[11px] text-[#007aff] font-medium mt-2 px-1"
+                className="text-[11px] text-accent font-medium mt-2 px-1"
               >
                 + Add your first income source
               </button>
@@ -551,7 +551,7 @@ export default function AccountsPage() {
                   className={cn(
                     "rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-colors",
                     depositDate === option.value
-                      ? "bg-[#34c759] text-white"
+                      ? "bg-positive text-white"
                       : "glass text-muted hover:text-foreground"
                   )}
                 >
@@ -567,7 +567,7 @@ export default function AccountsPage() {
             placeholder="e.g. Campus job shift, gas station refund"
           />
           {depositAccount && depositAmount && parseFloat(depositAmount) > 0 && depositSourceId && (
-            <div className="rounded-xl bg-[#34c759]/5 border border-[#34c759]/20 px-3 py-2 text-xs">
+            <div className="rounded-xl bg-positive/5 border border-positive/20 px-3 py-2 text-xs">
               <p>
                 {personSources.find((s) => s.id === depositSourceId)?.name} →{" "}
                 {formatCurrency(parseFloat(depositAmount))} into {depositAccount.name}

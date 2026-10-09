@@ -164,7 +164,7 @@ export default function MemoryPage() {
               aria-label={option.label}
               className={cn(
                 "rounded-md p-1.5 transition-colors",
-                layout === option.id ? "bg-[#af52de] text-white" : "text-muted"
+                layout === option.id ? "bg-feature text-white" : "text-muted"
               )}
             >
               <option.icon className="h-3.5 w-3.5" />
@@ -193,7 +193,7 @@ export default function MemoryPage() {
             onClick={() => setWho(option.id)}
             className={cn(
               "flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors",
-              who === option.id ? "bg-[#af52de] text-white" : "text-muted"
+              who === option.id ? "bg-feature text-white" : "text-muted"
             )}
           >
             {option.label}
@@ -210,7 +210,7 @@ export default function MemoryPage() {
             : `${pendingCount} open · ${dueSoonCount} due now`
         }
         count={pendingCount}
-        tint="#ff9500"
+        tint="var(--warning)"
         icon={<Bell className="w-3.5 h-3.5" />}
         addLabel="Add"
         onAdd={() => setReminderEditor({})}
@@ -240,14 +240,14 @@ export default function MemoryPage() {
                       className={cn(
                         "rounded-full px-1.5 py-0.5 text-[9.5px] font-semibold",
                         reminder.done
-                          ? "bg-[#34c759]/15 text-[#34c759]"
-                          : "bg-[#ff9500]/15 text-[#ff9500]"
+                          ? "bg-positive/15 text-positive"
+                          : "bg-caution/15 text-caution"
                       )}
                     >
                       {reminder.done ? "Done · reopen" : "Open · mark done"}
                     </button>
                     {!reminder.done && soon ? (
-                      <span className="rounded-full bg-[#ff3b30]/15 px-1.5 py-0.5 text-[9.5px] font-semibold text-[#ff3b30]">
+                      <span className="rounded-full bg-negative/15 px-1.5 py-0.5 text-[9.5px] font-semibold text-negative">
                         {dueLabel(reminder)}
                       </span>
                     ) : null}
@@ -259,10 +259,10 @@ export default function MemoryPage() {
                     {!reminder.done ? (
                       <span className="inline-flex items-center gap-0.5 text-[9.5px] text-muted">
                         snooze
-                        <button type="button" onClick={() => snooze(reminder.id, 1)} className="hit rounded px-1 font-semibold text-[#007aff] hover:bg-black/5 dark:hover:bg-white/10">
+                        <button type="button" onClick={() => snooze(reminder.id, 1)} className="hit rounded px-1 font-semibold text-accent hover:bg-black/5 dark:hover:bg-white/10">
                           1d
                         </button>
-                        <button type="button" onClick={() => snooze(reminder.id, 7)} className="hit rounded px-1 font-semibold text-[#007aff] hover:bg-black/5 dark:hover:bg-white/10">
+                        <button type="button" onClick={() => snooze(reminder.id, 7)} className="hit rounded px-1 font-semibold text-accent hover:bg-black/5 dark:hover:bg-white/10">
                           1w
                         </button>
                       </span>
@@ -277,7 +277,7 @@ export default function MemoryPage() {
                   <button
                     type="button"
                     onClick={() => setReminderEditor({ reminder })}
-                    className="rounded-md p-1.5 text-[11px] text-[#007aff] hover:bg-black/5 dark:hover:bg-white/10"
+                    className="rounded-md p-1.5 text-[11px] text-accent hover:bg-black/5 dark:hover:bg-white/10"
                   >
                     Edit
                   </button>
@@ -290,7 +290,7 @@ export default function MemoryPage() {
                         run: () => deleteStructuredReminder(reminder.id),
                       })
                     }
-                    className="rounded-md p-1.5 text-[11px] text-[#ff3b30] hover:bg-black/5 dark:hover:bg-white/10"
+                    className="rounded-md p-1.5 text-[11px] text-negative hover:bg-black/5 dark:hover:bg-white/10"
                   >
                     Delete
                   </button>
@@ -306,7 +306,7 @@ export default function MemoryPage() {
         title={`How ${assistantName} behaves`}
         hint="Rules it follows in every conversation"
         count={behaviorInstructions.length}
-        tint="#af52de"
+        tint="var(--feature)"
         icon={<Sparkles className="w-3.5 h-3.5" />}
         addLabel="Add"
         onAdd={() => setAdding("behavior")}
@@ -351,7 +351,7 @@ export default function MemoryPage() {
         title="Bills"
         hint={`Recurring costs ${assistantName} can remind you about`}
         count={monthlyExpenses.length}
-        tint="#ff3b30"
+        tint="var(--danger)"
         icon={<ReceiptText className="w-3.5 h-3.5" />}
         addLabel="Add"
         onAdd={() => setBillEditor({})}
@@ -376,7 +376,7 @@ export default function MemoryPage() {
                 <button
                   type="button"
                   onClick={() => setBillEditor({ bill })}
-                  className="rounded-md p-1.5 text-[11px] text-[#007aff] hover:bg-black/5 dark:hover:bg-white/10"
+                  className="rounded-md p-1.5 text-[11px] text-accent hover:bg-black/5 dark:hover:bg-white/10"
                 >
                   Edit
                 </button>
@@ -389,7 +389,7 @@ export default function MemoryPage() {
                       run: () => deleteMonthlyExpense(bill.id),
                     })
                   }
-                  className="rounded-md p-1.5 text-[11px] text-[#ff3b30] hover:bg-black/5 dark:hover:bg-white/10"
+                  className="rounded-md p-1.5 text-[11px] text-negative hover:bg-black/5 dark:hover:bg-white/10"
                 >
                   Delete
                 </button>
@@ -404,7 +404,7 @@ export default function MemoryPage() {
         title="Income sources"
         hint="Where money comes from"
         count={incomeSources.length}
-        tint="#34c759"
+        tint="var(--success)"
         icon={<TrendingUp className="w-3.5 h-3.5" />}
         addLabel="Add"
         onAdd={() => setAdding("source")}
@@ -446,7 +446,7 @@ export default function MemoryPage() {
         title="Spending categories"
         hint="How spending gets sorted, and the words that match each one"
         count={spendCategories.length}
-        tint="#007aff"
+        tint="var(--accent)"
         icon={<Tags className="w-3.5 h-3.5" />}
         addLabel="Add"
         onAdd={() => setAdding("category")}
@@ -492,7 +492,7 @@ export default function MemoryPage() {
         title="Debts"
         hint="What is still owed"
         count={openDebts.length}
-        tint="#ff2d55"
+        tint="var(--pink)"
         icon={<Landmark className="w-3.5 h-3.5" />}
       >
         {openDebts.length === 0 ? (
@@ -504,7 +504,7 @@ export default function MemoryPage() {
                 <p className="text-[13px] font-medium truncate">{debt.name}</p>
                 <p className="text-[10px] text-muted">{PERSON_LABELS[debt.person]}</p>
               </div>
-              <p className="shrink-0 text-[13px] font-semibold text-[#ff3b30] tabular-nums">
+              <p className="shrink-0 text-[13px] font-semibold text-negative tabular-nums">
                 {formatCurrency(debt.amount)}
               </p>
             </div>
@@ -512,7 +512,7 @@ export default function MemoryPage() {
         )}
         <Link
           href="/debts"
-          className="block px-4 py-2.5 text-[11px] font-semibold text-[#007aff]"
+          className="block px-4 py-2.5 text-[11px] font-semibold text-accent"
         >
           Record payments on the Debts page →
         </Link>
@@ -522,7 +522,7 @@ export default function MemoryPage() {
         title="Accounts"
         hint="Cards, banks, and cash"
         count={accounts.length}
-        tint="#5856d6"
+        tint="var(--accent-secondary)"
         icon={<CreditCard className="w-3.5 h-3.5" />}
       >
         {accounts.map((account) => (
@@ -541,7 +541,7 @@ export default function MemoryPage() {
         ))}
         <Link
           href="/accounts"
-          className="block px-4 py-2.5 text-[11px] font-semibold text-[#007aff]"
+          className="block px-4 py-2.5 text-[11px] font-semibold text-accent"
         >
           Change balances on the Accounts page →
         </Link>

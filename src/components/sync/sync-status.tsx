@@ -39,7 +39,7 @@ export function SyncStatusBadge() {
     return (
       <Link
         href="/sync"
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-[#ff9500] hover:bg-black/5 dark:hover:bg-white/5"
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-caution hover:bg-black/5 dark:hover:bg-white/5"
         title="Cloud sync not configured"
       >
         <CloudOff className="w-3.5 h-3.5" />
@@ -63,7 +63,7 @@ export function SyncStatusBadge() {
       className={cn(
         "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all",
         "text-muted hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5",
-        status === "error" && "text-[#ff3b30]"
+        status === "error" && "text-negative"
       )}
       title={error ?? label}
     >

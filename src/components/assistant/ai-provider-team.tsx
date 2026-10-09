@@ -68,7 +68,7 @@ export function AiProviderTeam({ voiceLive = false }: { voiceLive?: boolean }) {
             className={cn(
               "inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[10px] font-semibold leading-none",
               live
-                ? "border-[#34c759]/35 bg-[#34c759]/12 text-[#1f7a3a] dark:text-[#7dff9a]"
+                ? "border-positive/35 bg-positive/12 text-[#1f7a3a] dark:text-[#7dff9a]"
                 : "border-black/10 dark:border-white/10 bg-black/[0.04] dark:bg-white/[0.06] text-muted"
             )}
             title={

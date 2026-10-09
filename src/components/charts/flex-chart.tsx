@@ -1,5 +1,6 @@
 "use client";
 
+import { useId } from "react";
 import {
   Area,
   AreaChart,
@@ -23,6 +24,9 @@ import {
 } from "recharts";
 import { formatCurrency } from "@/lib/formatters";
 
+/** One tempo for every mark: fast enough to feel instant, slow enough to read. */
+const CHART_MS = 700;
+
 /**
  * One chart, any shape.
  *
@@ -37,16 +41,16 @@ import { formatCurrency } from "@/lib/formatters";
 export type FlexChartType = "bar" | "line" | "area" | "pie" | "donut" | "scatter" | "bubble";
 
 export const CHART_PALETTE = [
-  "#007aff",
-  "#34c759",
-  "#ff9500",
-  "#ff3b30",
-  "#5ac8fa",
-  "#bf5af2",
-  "#ffd60a",
-  "#ac8e68",
-  "#30d158",
-  "#ff375f",
+  "var(--accent)",
+  "var(--success)",
+  "var(--warning)",
+  "var(--danger)",
+  "var(--accent-cyan)",
+  "#a78bfa",
+  "var(--amber)",
+  "#6f7fa8",
+  "var(--chart-moss)",
+  "#ff5d73",
 ] as const;
 
 export function chartColor(index: number): string {
@@ -57,6 +61,12 @@ export interface FlexChartPoint {
   /** Category / x value, already formatted for display. */
   label: string;
   value: number;
+  /**
+   * This point's own colour, for points that stand for something with an
+   * identity (a country): the colour follows the thing, not its position, so
+   * a filter that drops one point does not repaint the rest.
+   */
+  color?: string;
   /** Bubble size. */
   size?: number;
   /** Numeric x for scatter/bubble; falls back to position. */
@@ -77,11 +87,11 @@ function Empty({ message }: { message: string }) {
 function TooltipBox({
   active,
   payload,
-  money,
+  format,
 }: {
   active?: boolean;
   payload?: { name?: string; value?: number; payload?: FlexChartPoint }[];
-  money: boolean;
+  format: (value: number) => string;
 }) {
   if (!active || !payload?.length) return null;
   const point = payload[0];
@@ -89,7 +99,7 @@ function TooltipBox({
   return (
     <div className="glass rounded-lg px-2.5 py-1.5 text-[11px] shadow-lg">
       <p className="font-medium">{point?.payload?.label ?? point?.name}</p>
-      <p className="tabular-nums">{money ? formatCurrency(value) : value.toLocaleString()}</p>
+      <p className="tabular-nums">{format(value)}</p>
     </div>
   );
 }
@@ -98,6 +108,9 @@ export function FlexChart({
   type,
   data,
   money = true,
+  format,
+  formatShort,
+  color,
   height = 220,
   xLabel,
   emptyMessage = "Nothing recorded yet.",
@@ -106,18 +119,31 @@ export function FlexChart({
   data: FlexChartPoint[];
   /** Format values as currency. */
   money?: boolean;
+  /** Overrides `money` — for amounts that are not dollars (₹, ₱). */
+  format?: (value: number) => string;
+  /** The axis's compact form of `format`, e.g. "₹48k". */
+  formatShort?: (value: number) => string;
+  /** One colour for every mark: a single series reads as one thing, not a rainbow. */
+  color?: string;
   height?: number;
   xLabel?: string;
   emptyMessage?: string;
 }) {
+  // Two area charts on one page must not share a gradient; ids are document-wide.
+  const fillId = `flexFill-${useId().replace(/:/g, "")}`;
   if (data.length === 0) return <Empty message={emptyMessage} />;
 
-  const fmt = (value: number) =>
-    money ? formatCurrency(value) : Number(value).toLocaleString();
-  const shortFmt = (value: number) =>
-    money
-      ? `$${Math.abs(value) >= 1000 ? `${(value / 1000).toFixed(1)}k` : value.toFixed(0)}`
-      : String(value);
+  const fmt =
+    format ?? ((value: number) => (money ? formatCurrency(value) : Number(value).toLocaleString()));
+  const shortFmt =
+    formatShort ??
+    ((value: number) =>
+      money
+        ? `$${Math.abs(value) >= 1000 ? `${(value / 1000).toFixed(1)}k` : value.toFixed(0)}`
+        : String(value));
+  const markColor = (point: FlexChartPoint | undefined, index: number) =>
+    point?.color ?? color ?? chartColor(index);
+  const lineColor = color ?? chartColor(0);
 
   // Printing a label on every mark stops being readable past ~12 of them.
   const showLabels = data.length <= 12;
@@ -127,7 +153,7 @@ export function FlexChart({
     return (
       <ResponsiveContainer width="100%" height={height}>
         <PieChart>
-          <Pie
+          <Pie animationDuration={CHART_MS} animationEasing="ease-out"
             data={data}
             dataKey="value"
             nameKey="label"
@@ -146,10 +172,10 @@ export function FlexChart({
             style={{ fontSize: 10, fill: "currentColor" }}
           >
             {data.map((point, index) => (
-              <Cell key={`${point.label}-${index}`} fill={chartColor(index)} />
+              <Cell key={`${point.label}-${index}`} fill={markColor(point, index)} />
             ))}
           </Pie>
-          <Tooltip content={<TooltipBox money={money} />} />
+          <Tooltip content={<TooltipBox format={fmt} />} />
           <Legend
             wrapperStyle={{ fontSize: 10 }}
             formatter={(value: string, entry: { payload?: { value?: number } }) =>
@@ -199,8 +225,8 @@ export function FlexChart({
             tickFormatter={shortFmt}
           />
           {type === "bubble" ? <ZAxis type="number" dataKey="z" range={[60, 620]} /> : null}
-          <Tooltip content={<TooltipBox money={money} />} cursor={{ strokeDasharray: "3 3" }} />
-          <Scatter data={points} fill={chartColor(0)} fillOpacity={0.75}>
+          <Tooltip content={<TooltipBox format={fmt} />} cursor={{ strokeDasharray: "3 3" }} />
+          <Scatter animationDuration={CHART_MS} animationEasing="ease-out" data={points} fill={lineColor} fillOpacity={0.75}>
             {showLabels ? (
               <LabelList
                 dataKey="value"
@@ -210,7 +236,7 @@ export function FlexChart({
               />
             ) : null}
             {points.map((point, index) => (
-              <Cell key={`${point.label}-${index}`} fill={chartColor(index)} />
+              <Cell key={`${point.label}-${index}`} fill={markColor(point, index)} />
             ))}
           </Scatter>
         </ScatterChart>
@@ -224,22 +250,22 @@ export function FlexChart({
       <ResponsiveContainer width="100%" height={height}>
         <ChartTag data={data} margin={{ top: 16, right: 12, bottom: 0, left: -12 }}>
           <defs>
-            <linearGradient id="flexFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={chartColor(0)} stopOpacity={0.35} />
-              <stop offset="100%" stopColor={chartColor(0)} stopOpacity={0.02} />
+            <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={lineColor} stopOpacity={0.35} />
+              <stop offset="100%" stopColor={lineColor} stopOpacity={0.02} />
             </linearGradient>
           </defs>
           <CartesianGrid stroke={GRID} strokeDasharray="3 3" vertical={false} />
           <XAxis dataKey="label" tick={AXIS} tickLine={false} axisLine={false} interval="preserveStartEnd" />
           <YAxis tick={AXIS} tickLine={false} axisLine={false} tickFormatter={shortFmt} width={44} />
-          <Tooltip content={<TooltipBox money={money} />} />
+          <Tooltip content={<TooltipBox format={fmt} />} />
           {type === "area" ? (
-            <Area
+            <Area animationDuration={CHART_MS} animationEasing="ease-out"
               type="monotone"
               dataKey="value"
-              stroke={chartColor(0)}
+              stroke={lineColor}
               strokeWidth={2}
-              fill="url(#flexFill)"
+              fill={`url(#${fillId})`}
             >
               {showLabels ? (
                 <LabelList
@@ -251,12 +277,12 @@ export function FlexChart({
               ) : null}
             </Area>
           ) : (
-            <Line
+            <Line animationDuration={CHART_MS} animationEasing="ease-out"
               type="monotone"
               dataKey="value"
-              stroke={chartColor(0)}
+              stroke={lineColor}
               strokeWidth={2}
-              dot={{ r: 3, fill: chartColor(0) }}
+              dot={{ r: 3, fill: lineColor }}
               activeDot={{ r: 5 }}
             >
               {showLabels ? (
@@ -281,8 +307,8 @@ export function FlexChart({
         <CartesianGrid stroke={GRID} strokeDasharray="3 3" vertical={false} />
         <XAxis dataKey="label" tick={AXIS} tickLine={false} axisLine={false} interval="preserveStartEnd" />
         <YAxis tick={AXIS} tickLine={false} axisLine={false} tickFormatter={shortFmt} width={44} />
-        <Tooltip content={<TooltipBox money={money} />} cursor={{ fill: "rgba(127,127,127,0.08)" }} />
-        <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={54}>
+        <Tooltip content={<TooltipBox format={fmt} />} cursor={{ fill: "rgba(127,127,127,0.08)" }} />
+        <Bar animationDuration={CHART_MS} animationEasing="ease-out" dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={54}>
           {showLabels ? (
             <LabelList
               dataKey="value"
@@ -292,7 +318,7 @@ export function FlexChart({
             />
           ) : null}
           {data.map((point, index) => (
-            <Cell key={`${point.label}-${index}`} fill={chartColor(index)} />
+            <Cell key={`${point.label}-${index}`} fill={markColor(point, index)} />
           ))}
         </Bar>
       </BarChart>

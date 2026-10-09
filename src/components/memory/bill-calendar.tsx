@@ -113,8 +113,8 @@ export function BillCalendar({ bills, reminders }: { bills: MonthlyExpense[]; re
               onClick={() => setSelected(k)}
               className={cn(
                 "flex aspect-square flex-col items-center justify-center rounded-lg text-[11px] tabular-nums transition-colors",
-                isSelected ? "bg-[#007aff] text-white" : "hover:bg-black/5 dark:hover:bg-white/10",
-                isToday && !isSelected && "font-bold text-[#007aff]"
+                isSelected ? "glass-pill" : "hover:bg-black/5 dark:hover:bg-white/10",
+                isToday && !isSelected && "font-bold text-accent"
               )}
               aria-label={`${date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}${items.length ? `, ${items.length} due` : ""}`}
             >
@@ -125,7 +125,7 @@ export function BillCalendar({ bills, reminders }: { bills: MonthlyExpense[]; re
                     key={item.key}
                     className={cn(
                       "h-1.5 w-1.5 rounded-full",
-                      isSelected ? "bg-white" : item.kind === "bill" ? "bg-[#ff9500]" : "bg-[#af52de]"
+                      isSelected ? "bg-white" : item.kind === "bill" ? "bg-caution" : "bg-feature"
                     )}
                   />
                 ))}
@@ -142,7 +142,7 @@ export function BillCalendar({ bills, reminders }: { bills: MonthlyExpense[]; re
           <div className="space-y-1">
             {selectedItems.map((item) => (
               <div key={item.key} className="flex items-center gap-2 text-[12px]">
-                <span className={cn("h-2 w-2 shrink-0 rounded-full", item.kind === "bill" ? "bg-[#ff9500]" : "bg-[#af52de]")} />
+                <span className={cn("h-2 w-2 shrink-0 rounded-full", item.kind === "bill" ? "bg-caution" : "bg-feature")} />
                 <span className="min-w-0 flex-1 truncate">{item.name}</span>
                 {item.amount !== null ? (
                   <span className="shrink-0 font-semibold tabular-nums">{formatCurrency(item.amount)}</span>

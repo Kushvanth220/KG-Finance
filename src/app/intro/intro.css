@@ -7,20 +7,26 @@
  */
 
 .intro {
-  --intro-ink: #f5f5f7;
+  --intro-ink: #f4f8ff;
   --intro-muted: rgba(235, 235, 245, 0.62);
   --intro-glass: rgba(44, 44, 46, 0.62);
   --intro-edge: rgba(255, 255, 255, 0.11);
-  --intro-blue: #007aff;
-  --intro-indigo: #5856d6;
-  --intro-purple: #af52de;
-  --intro-green: #34c759;
-  --intro-flex: #0077ff;
+  --intro-blue: #3781fc;
+  --intro-indigo: #1951fc;
+  --intro-purple: #a78bfa;
+  --intro-green: #46d1a5;
+  --intro-flex: #3781fc;
 
-  background: #050508;
+  background: #02040c;
   color: var(--intro-ink);
   min-height: 100dvh;
   overflow-x: hidden;
+}
+
+/* The page is always dark, so the lion and its name are always ice. */
+.intro-root {
+  --lion: #cbe9fd;
+  --wordmark: #e8f1ff;
 }
 
 /* ---------- ambient ---------- */
@@ -116,7 +122,7 @@
 }
 .intro-h1 em {
   font-style: normal;
-  background: linear-gradient(135deg, #4da3ff, #8b7cff 55%, #d67cff);
+  background: linear-gradient(135deg, #6cc6ff, #6f9dff 55%, #bba6ff);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -213,10 +219,10 @@
   width: min(300px, 70vw);
   aspect-ratio: 390 / 844;
   border-radius: 44px;
-  background: #0b0b10;
+  background: #02040c;
   border: 1px solid rgba(255, 255, 255, 0.16);
   box-shadow:
-    0 0 0 6px #17171d,
+    0 0 0 6px #03195b,
     0 40px 90px rgba(0, 0, 0, 0.7),
     0 0 80px rgba(0, 122, 255, 0.16);
   transform-style: preserve-3d;
@@ -307,7 +313,7 @@
   width: 84px;
   height: 84px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #007aff, #5856d6 55%, #af52de);
+  background: linear-gradient(135deg, #3781fc, #1951fc 55%, #a78bfa);
   box-shadow: 0 0 40px rgba(0, 122, 255, 0.55), 0 0 90px rgba(175, 82, 222, 0.35);
 }
 .intro-orb::after {
@@ -387,7 +393,7 @@
   border: 1px solid var(--intro-edge);
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6), 0 0 60px rgba(88, 86, 214, 0.15);
   aspect-ratio: 16 / 9;
-  background: #050508;
+  background: #02040c;
 }
 .intro-film > * { width: 100%; height: 100%; display: block; }
 

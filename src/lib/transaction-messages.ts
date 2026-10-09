@@ -197,6 +197,20 @@ export function getTransactionActor(transaction: Transaction): Person {
   return transaction.paidByPerson ?? transaction.person;
 }
 
+/** Money that came back: an expense flagged as a refund, or recorded negative. */
+export function isRefund(transaction: Transaction): boolean {
+  return transaction.type === "expense" && (transaction.refund === true || transaction.amount < 0);
+}
+
+/**
+ * Whether a row reads as money in (+): income, a cash deposit, or a refund.
+ * One rule, so History and the account wallet cannot show the same row with
+ * opposite signs.
+ */
+export function isMoneyIn(transaction: Transaction): boolean {
+  return transaction.type === "income" || transaction.type === "cash_deposit" || isRefund(transaction);
+}
+
 function appendNotesIfMissingRaw(message: string, notes?: string): string {
   // Notes are the writer's own words, shown as written.
   const note = notes?.trim();

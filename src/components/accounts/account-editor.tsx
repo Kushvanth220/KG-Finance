@@ -101,7 +101,7 @@ export function AccountEditor({
                 disabled={editing}
                 className={cn(
                   "rounded-xl px-2 py-2.5 text-xs font-semibold transition-colors disabled:opacity-45",
-                  type === option.value ? "bg-[#007aff] text-white" : "glass text-muted"
+                  type === option.value ? "glass-pill" : "glass text-muted"
                 )}
               >
                 {option.label}
@@ -125,7 +125,7 @@ export function AccountEditor({
                 onClick={() => setPerson(who)}
                 className={cn(
                   "flex-1 rounded-xl px-3 py-2.5 text-xs font-semibold transition-colors",
-                  person === who ? "bg-[#007aff] text-white" : "glass text-muted"
+                  person === who ? "glass-pill" : "glass text-muted"
                 )}
               >
                 {PERSON_LABELS[who]}
@@ -173,7 +173,7 @@ export function AccountEditor({
           <span
             className={cn(
               "h-5 w-9 shrink-0 rounded-full p-0.5 transition-colors",
-              shared ? "bg-[#34c759]" : "bg-black/15 dark:bg-white/20"
+              shared ? "bg-positive" : "bg-black/15 dark:bg-white/20"
             )}
           >
             <span

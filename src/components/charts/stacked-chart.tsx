@@ -17,6 +17,9 @@ import {
 } from "recharts";
 import { formatCurrency } from "@/lib/formatters";
 
+/** One tempo for every mark: fast enough to feel instant, slow enough to read. */
+const CHART_MS = 700;
+
 /**
  * Several measures on one chart.
  *
@@ -127,7 +130,7 @@ export function StackedChart({
           <Tooltip content={<Tip series={series} />} cursor={{ fill: "rgba(127,127,127,0.08)" }} />
           {legend}
           {series.map((item, index) => (
-            <Bar
+            <Bar animationDuration={CHART_MS} animationEasing="ease-out"
               key={item.key}
               dataKey={item.key}
               stackId="stack"
@@ -165,7 +168,7 @@ export function StackedChart({
         {legend}
         {series.map((item) =>
           type === "area" ? (
-            <Area
+            <Area animationDuration={CHART_MS} animationEasing="ease-out"
               key={item.key}
               type="monotone"
               dataKey={item.key}
@@ -175,7 +178,7 @@ export function StackedChart({
               fillOpacity={0.15}
             />
           ) : (
-            <Line
+            <Line animationDuration={CHART_MS} animationEasing="ease-out"
               key={item.key}
               type="monotone"
               dataKey={item.key}

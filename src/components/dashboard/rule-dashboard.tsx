@@ -72,7 +72,7 @@ export function RuleDashboards({ person }: { person: Person | "overall" }) {
           <GlassCard key={rule.id} className="!p-0 overflow-hidden">
             <div className="flex items-start justify-between gap-3 px-4 pt-3">
               <div className="min-w-0">
-                <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#007aff]">
+                <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-accent">
                   <ScrollText className="h-3 w-3" /> {rule.name}
                 </p>
                 <p className="mt-0.5 text-[11px] text-muted">
@@ -86,14 +86,14 @@ export function RuleDashboards({ person }: { person: Person | "overall" }) {
                   aria-label={`Choose what ${rule.name} shows`}
                   className={cn(
                     "rounded-lg p-1.5 transition-colors",
-                    isTuning ? "bg-[#007aff] text-white" : "text-muted hover:text-foreground"
+                    isTuning ? "glass-pill" : "text-muted hover:text-foreground"
                   )}
                 >
                   <SlidersHorizontal className="h-3.5 w-3.5" />
                 </button>
                 <Link
                   href="/rules"
-                  className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-[#007aff]"
+                  className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-accent"
                 >
                   Open <ChevronRight className="h-3 w-3" />
                 </Link>
@@ -122,7 +122,7 @@ export function RuleDashboards({ person }: { person: Person | "overall" }) {
                           className={cn(
                             "flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[10px] font-bold",
                             item.enabled
-                              ? "border-[#34c759] bg-[#34c759] text-white"
+                              ? "border-positive bg-positive text-white"
                               : "border-black/20 dark:border-white/25"
                           )}
                         >

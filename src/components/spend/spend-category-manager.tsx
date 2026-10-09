@@ -121,7 +121,7 @@ export function SpendCategoryManager({
   }
 
   const field =
-    "w-full glass rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#007aff]/40";
+    "w-full glass-field rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent/40";
 
   return (
     <GlassModal open={open} onClose={handleClose} title="Edit categories">
@@ -156,7 +156,7 @@ export function SpendCategoryManager({
                     className="tap-icon focus-ring p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10"
                     aria-label={`Edit ${category.name}`}
                   >
-                    <Pencil className="w-3.5 h-3.5 text-[#007aff]" />
+                    <Pencil className="w-3.5 h-3.5 text-accent" />
                   </button>
                   <button
                     type="button"
@@ -164,7 +164,7 @@ export function SpendCategoryManager({
                     className="tap-icon focus-ring p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10"
                     aria-label={`Delete ${category.name}`}
                   >
-                    <Trash2 className="w-3.5 h-3.5 text-[#ff3b30]" />
+                    <Trash2 className="w-3.5 h-3.5 text-negative" />
                   </button>
                 </div>
               </div>
@@ -182,7 +182,7 @@ export function SpendCategoryManager({
               onChange={(e) => setCatEmoji(firstGlyph(e.target.value))}
               placeholder={shownEmoji}
               aria-label="Emoji"
-              className="w-14 shrink-0 glass rounded-xl px-2 py-2 text-center text-lg outline-none placeholder:opacity-60 focus:ring-2 focus:ring-[#007aff]/40"
+              className="w-14 shrink-0 glass rounded-xl px-2 py-2 text-center text-lg outline-none placeholder:opacity-60 focus:ring-2 focus:ring-accent/40"
               style={{ background: `${shownColor}22` }}
             />
             <input
@@ -204,7 +204,7 @@ export function SpendCategoryManager({
                   aria-pressed={active}
                   className={cn(
                     "hit h-6 w-6 rounded-full transition-transform",
-                    active && "scale-110 ring-2 ring-offset-2 ring-offset-white ring-[color:var(--c)] dark:ring-offset-[#1c1c1e]"
+                    active && "scale-110 ring-2 ring-offset-2 ring-offset-white ring-[color:var(--c)] dark:ring-offset-[#03195b]"
                   )}
                   style={{ background: color, "--c": color } as CSSProperties}
                 />

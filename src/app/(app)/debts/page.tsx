@@ -119,7 +119,7 @@ export default function DebtsPage() {
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-[11px] text-muted">Total outstanding</p>
-            <p className="text-2xl font-bold text-[#ff3b30] tabular-nums">
+            <p className="text-2xl font-bold text-negative tabular-nums">
               {formatCurrency(summary.total)}
             </p>
           </div>
@@ -128,7 +128,7 @@ export default function DebtsPage() {
               {summary.activeCount} open {summary.activeCount === 1 ? "debt" : "debts"}
             </p>
             {summary.creditCardBills > 0 && (
-              <p className="inline-flex items-center gap-1 text-[11px] font-medium text-[#ff9500]">
+              <p className="inline-flex items-center gap-1 text-[11px] font-medium text-caution">
                 <CreditCard className="w-3 h-3" />
                 {summary.creditCardBills} card {summary.creditCardBills === 1 ? "bill" : "bills"}
               </p>
@@ -171,7 +171,7 @@ export default function DebtsPage() {
             onClick={() => setShowCleared((v) => !v)}
             className="flex items-center gap-1.5 text-xs font-medium text-muted px-1"
           >
-            <CheckCircle2 className="w-3.5 h-3.5 text-[#34c759]" />
+            <CheckCircle2 className="w-3.5 h-3.5 text-positive" />
             {summary.clearedDebts.length} cleared
             <span className="text-[10px]">{showCleared ? "Hide" : "Show"}</span>
           </button>
@@ -185,7 +185,7 @@ export default function DebtsPage() {
                       <p className="text-[10px] text-muted truncate">{debt.notes}</p>
                     )}
                   </div>
-                  <span className="text-[10px] font-semibold text-[#34c759] shrink-0">Cleared</span>
+                  <span className="text-[10px] font-semibold text-positive shrink-0">Cleared</span>
                 </div>
                 <div className="flex justify-end mt-2">
                   <GlassButton
@@ -194,7 +194,7 @@ export default function DebtsPage() {
                     onClick={() => setPendingDeleteDebt(debt)}
                     aria-label={`Delete cleared debt ${debt.name}`}
                   >
-                    <Trash2 className="w-3 h-3 text-[#ff3b30]" />
+                    <Trash2 className="w-3 h-3 text-negative" />
                   </GlassButton>
                 </div>
               </GlassCard>
@@ -259,10 +259,10 @@ export default function DebtsPage() {
       >
         {payingDebt && (
           <div className="space-y-4">
-            <div className="rounded-xl bg-[#ff3b30]/5 border border-[#ff3b30]/20 px-3 py-2 text-xs">
+            <div className="rounded-xl bg-negative/5 border border-negative/20 px-3 py-2 text-xs">
               <div className="flex justify-between gap-2">
                 <span className="text-muted">Currently owed</span>
-                <span className="font-semibold text-[#ff3b30]">
+                <span className="font-semibold text-negative">
                   {formatCurrency(payingDebt.amount)}
                 </span>
               </div>
@@ -277,7 +277,7 @@ export default function DebtsPage() {
             />
 
             {parsedPayAmount > 0 && (
-              <div className="rounded-xl bg-[#007aff]/5 border border-[#007aff]/20 px-3 py-2 text-xs space-y-1">
+              <div className="rounded-xl bg-accent/5 border border-accent/20 px-3 py-2 text-xs space-y-1">
                 <div className="flex justify-between gap-2">
                   <span className="text-muted">Clearing now</span>
                   <span className="font-semibold">
@@ -286,7 +286,7 @@ export default function DebtsPage() {
                 </div>
                 <div className="flex justify-between gap-2">
                   <span className="text-muted">Remaining after</span>
-                  <span className={cn("font-semibold", payRemaining <= 0 ? "text-[#34c759]" : "text-[#ff9500]")}>
+                  <span className={cn("font-semibold", payRemaining <= 0 ? "text-positive" : "text-caution")}>
                     {payRemaining <= 0 ? "Fully cleared" : formatCurrency(payRemaining)}
                   </span>
                 </div>
@@ -339,7 +339,7 @@ function DebtNoteCard({
           <div className="flex items-center gap-1.5 flex-wrap">
             <p className="text-xs font-semibold truncate">{debt.name}</p>
             {debt.linkedAccountId && (
-              <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-[#ff9500]/15 text-[#ff9500]">
+              <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-caution/15 text-caution">
                 <CreditCard className="w-2.5 h-2.5" />
                 Card bill
               </span>
@@ -349,7 +349,7 @@ function DebtNoteCard({
             <p className="text-[10px] text-muted mt-0.5 line-clamp-2">{debt.notes}</p>
           )}
         </div>
-        <p className="text-base font-bold text-[#ff3b30] tabular-nums shrink-0">
+        <p className="text-base font-bold text-negative tabular-nums shrink-0">
           {formatCurrency(debt.amount)}
         </p>
       </div>
@@ -365,7 +365,7 @@ function DebtNoteCard({
           <Pencil className="w-3 h-3" />
         </GlassButton>
         <GlassButton size="sm" variant="ghost" onClick={onDelete}>
-          <Trash2 className="w-3 h-3 text-[#ff3b30]" />
+          <Trash2 className="w-3 h-3 text-negative" />
         </GlassButton>
       </div>
     </GlassCard>

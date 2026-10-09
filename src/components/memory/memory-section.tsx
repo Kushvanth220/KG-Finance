@@ -112,14 +112,14 @@ export function EditableRow({
           placeholder={placeholder}
           rows={2}
           autoFocus
-          className="w-full glass rounded-lg px-2.5 py-2 text-[13px] outline-none resize-none focus:ring-2 focus:ring-[#007aff]/40"
+          className="w-full glass-field rounded-lg px-2.5 py-2 text-[13px] outline-none resize-none focus:ring-2 focus:ring-accent/40"
         />
         <div className="flex gap-2">
           <button
             type="button"
             onClick={commit}
             disabled={!draft.trim()}
-            className="rounded-lg bg-[#007aff] px-3 py-1.5 text-[11px] font-semibold text-white disabled:opacity-40"
+            className="rounded-lg bg-accent px-3 py-1.5 text-[11px] font-semibold text-white disabled:opacity-40"
           >
             Save
           </button>
@@ -150,14 +150,14 @@ export function EditableRow({
         <button
           type="button"
           onClick={() => setEditing(true)}
-          className="rounded-md p-1.5 text-[11px] text-[#007aff] hover:bg-black/5 dark:hover:bg-white/10"
+          className="rounded-md p-1.5 text-[11px] text-accent hover:bg-black/5 dark:hover:bg-white/10"
         >
           Edit
         </button>
         <button
           type="button"
           onClick={onDelete}
-          className="rounded-md p-1.5 text-[11px] text-[#ff3b30] hover:bg-black/5 dark:hover:bg-white/10"
+          className="rounded-md p-1.5 text-[11px] text-negative hover:bg-black/5 dark:hover:bg-white/10"
         >
           Delete
         </button>
@@ -186,7 +186,7 @@ export function NewEntryRow({
         placeholder={placeholder}
         rows={2}
         autoFocus
-        className="w-full glass rounded-lg px-2.5 py-2 text-[13px] outline-none resize-none focus:ring-2 focus:ring-[#007aff]/40"
+        className="w-full glass-field rounded-lg px-2.5 py-2 text-[13px] outline-none resize-none focus:ring-2 focus:ring-accent/40"
       />
       <div className="flex gap-2">
         <button
@@ -196,7 +196,7 @@ export function NewEntryRow({
             if (next) onCommit(next);
           }}
           disabled={!draft.trim()}
-          className="rounded-lg bg-[#007aff] px-3 py-1.5 text-[11px] font-semibold text-white disabled:opacity-40"
+          className="rounded-lg bg-accent px-3 py-1.5 text-[11px] font-semibold text-white disabled:opacity-40"
         >
           Save
         </button>

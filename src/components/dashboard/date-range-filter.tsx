@@ -109,7 +109,7 @@ export function resolveRange(choice: RangeChoice, now: Date = new Date()): DateR
 export function DateRangeFilter({
   value,
   onChange,
-  accent = "#007aff",
+  accent = "var(--accent)",
 }: {
   value: RangeChoice;
   onChange: (next: RangeChoice) => void;
@@ -156,7 +156,7 @@ export function DateRangeFilter({
               value={value.from}
               max={value.to || today}
               onChange={(e) => e.target.value && onChange({ ...value, from: e.target.value })}
-              className="glass rounded-lg px-2 py-1 text-[12px] text-foreground outline-none focus:ring-2 focus:ring-[#007aff]/40"
+              className="glass rounded-lg px-2 py-1 text-[12px] text-foreground outline-none focus:ring-2 focus:ring-accent/40"
             />
           </label>
           <label className="flex flex-col gap-0.5 text-[10px] font-medium text-muted">
@@ -167,7 +167,7 @@ export function DateRangeFilter({
               min={value.from || undefined}
               max={today}
               onChange={(e) => e.target.value && onChange({ ...value, to: e.target.value })}
-              className="glass rounded-lg px-2 py-1 text-[12px] text-foreground outline-none focus:ring-2 focus:ring-[#007aff]/40"
+              className="glass rounded-lg px-2 py-1 text-[12px] text-foreground outline-none focus:ring-2 focus:ring-accent/40"
             />
           </label>
         </div>

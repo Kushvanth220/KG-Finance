@@ -44,9 +44,11 @@ import type {
   SettlementEntry,
   MonthlyExpense,
   Person,
+  Remittance,
   Transaction,
   TransactionType,
 } from "@/types";
+import { cleanDraft, type RemittanceDraft } from "@/lib/remittances";
 
 interface SpendOptions {
   person: Person;
@@ -107,6 +109,11 @@ interface FinanceActions {
   addFlexDeposit: (deposit: FlexDeposit) => void;
   updateFlexDeposit: (id: string, updates: Partial<FlexDeposit>) => void;
   removeFlexDeposit: (id: string) => void;
+
+  /** Money sent abroad. A record only: no balance moves and no History row is written. */
+  addRemittance: (draft: RemittanceDraft) => string;
+  updateRemittance: (id: string, draft: RemittanceDraft) => void;
+  deleteRemittance: (id: string) => void;
 
   addSpendCategory: (name: string, keywords?: string[]) => void;
   updateSpendCategory: (id: string, updates: Partial<import("@/types").SpendCategory>) => void;
@@ -410,6 +417,27 @@ export const useFinanceStore = create<FinanceStore>()(
       removeFlexDeposit: (id) =>
         set((state) => ({ flexDeposits: (state.flexDeposits ?? []).filter((d) => d.id !== id) })),
 
+      addRemittance: (draft) => {
+        const id = uuidv4();
+        const record: Remittance = { ...cleanDraft(draft), id, createdAt: new Date().toISOString() };
+        set((state) => ({ remittances: [record, ...(state.remittances ?? [])] }));
+        return id;
+      },
+
+      // The whole record is replaced from the edited draft: what was typed is
+      // what the transfer was. createdAt stays, so its place in a same-day tie holds.
+      updateRemittance: (id, draft) =>
+        set((state) => ({
+          remittances: (state.remittances ?? []).map((record) =>
+            record.id === id
+              ? { ...cleanDraft(draft), id, createdAt: record.createdAt, updatedAt: new Date().toISOString() }
+              : record
+          ),
+        })),
+
+      deleteRemittance: (id) =>
+        set((state) => ({ remittances: (state.remittances ?? []).filter((record) => record.id !== id) })),
+
       deleteIncome: (id, deletedBy) =>
         set((state) => {
           const entry = state.incomeEntries.find((item) => item.id === id);
@@ -472,12 +500,40 @@ export const useFinanceStore = create<FinanceStore>()(
           ],
         })),
 
+      /**
+       * Edit a category — and carry its transactions with it.
+       *
+       * A transaction remembers its category by NAME, not by id. Renaming the
+       * row on its own left every transaction pointing at a name that no
+       * longer existed: the money stayed in the ledger but fell out of its
+       * category, losing both its slice and its label. So a rename rewrites
+       * the tag on the rows that carry it, in the same update.
+       *
+       * The deleted-history log is left alone on purpose. It records what was
+       * true when a row was removed, and editing it would falsify an audit
+       * trail to tidy up a label.
+       */
       updateSpendCategory: (id, updates) =>
-        set((state) => ({
-          spendCategories: state.spendCategories.map((category) =>
-            category.id === id ? { ...category, ...updates } : category
-          ),
-        })),
+        set((state) => {
+          const before = state.spendCategories.find((category) => category.id === id);
+          const renamedTo = updates.name?.trim();
+          const renamed = Boolean(before && renamedTo && renamedTo !== before.name);
+
+          return {
+            spendCategories: state.spendCategories.map((category) =>
+              category.id === id
+                ? { ...category, ...updates, ...(renamedTo ? { name: renamedTo } : {}) }
+                : category
+            ),
+            transactions: renamed
+              ? state.transactions.map((transaction) =>
+                  transaction.category === before!.name
+                    ? { ...transaction, category: renamedTo }
+                    : transaction
+                )
+              : state.transactions,
+          };
+        }),
 
       deleteSpendCategory: (id) =>
         set((state) => ({
@@ -1436,6 +1492,7 @@ export function getFinanceState(): FinanceState {
     deletedHistory: state.deletedHistory ?? [],
     greenDotTrackingStartDate: state.greenDotTrackingStartDate,
     flexDeposits: state.flexDeposits ?? [],
+    remittances: state.remittances ?? [],
   };
 }
 

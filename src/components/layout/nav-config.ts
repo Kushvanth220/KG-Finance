@@ -7,6 +7,7 @@ import {
   History,
   Landmark,
   LayoutDashboard,
+  Send,
   Wallet,
 } from "lucide-react";
 
@@ -17,12 +18,13 @@ export const primaryNavItems = [
 ] as const;
 
 export const moreNavItems = [
-  { href: "/memory", label: "Memory", icon: Brain, tint: "#af52de" },
-  { href: "/flex", label: "Amazon Flex", icon: Truck, tint: "#0077FF" },
-  { href: "/accounts", label: "Accounts", icon: CreditCard, tint: "#34c759" },
-  { href: "/debts", label: "Debts", icon: Landmark, tint: "#ff3b30" },
-  { href: "/history", label: "History", icon: History, tint: "#ff9500" },
-  { href: "/sync", label: "Cloud Sync", icon: Cloud, tint: "#34c759" },
+  { href: "/memory", label: "Memory", icon: Brain, tint: "var(--feature)" },
+  { href: "/flex", label: "Amazon Flex", icon: Truck, tint: "#3781fc" },
+  { href: "/accounts", label: "Accounts", icon: CreditCard, tint: "var(--success)" },
+  { href: "/debts", label: "Debts", icon: Landmark, tint: "var(--danger)" },
+  { href: "/transfers", label: "Money Transfers", icon: Send, tint: "var(--accent-cyan)" },
+  { href: "/history", label: "History", icon: History, tint: "var(--warning)" },
+  { href: "/sync", label: "Cloud Sync", icon: Cloud, tint: "var(--success)" },
 ] as const;
 
 export function isNavActive(pathname: string, href: string) {

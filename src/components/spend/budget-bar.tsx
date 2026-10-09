@@ -39,9 +39,9 @@ export function budgetTone(spent: number, budget: number): "ok" | "warn" | "over
 }
 
 const TONE = {
-  ok: "#007aff",
-  warn: "#ff9500",
-  over: "#ff3b30",
+  ok: "var(--accent)",
+  warn: "var(--warning)",
+  over: "var(--danger)",
 } as const;
 
 export function BudgetBar({

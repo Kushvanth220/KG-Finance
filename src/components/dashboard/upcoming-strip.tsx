@@ -34,9 +34,9 @@ export function UpcomingStrip({ person }: { person: Person }) {
     <div className="glass rounded-xl px-3 py-2.5">
       <div className="mb-1.5 flex items-center justify-between gap-2">
         <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted">
-          <CalendarClock className="h-3 w-3 text-[#ff9500]" /> Coming up
+          <CalendarClock className="h-3 w-3 text-caution" /> Coming up
         </p>
-        <Link href="/memory" className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-[#007aff]">
+        <Link href="/memory" className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-accent">
           Memory <ChevronRight className="h-3 w-3" />
         </Link>
       </div>
@@ -44,15 +44,15 @@ export function UpcomingStrip({ person }: { person: Person }) {
         {items.map((item) => (
           <div key={item.key} className="flex items-center gap-2 text-[12px]">
             {item.kind === "reminder" ? (
-              <Bell className="h-3 w-3 shrink-0 text-[#af52de]" />
+              <Bell className="h-3 w-3 shrink-0 text-feature" />
             ) : (
-              <span className="h-3 w-3 shrink-0 rounded-sm bg-[#ff9500]/80" />
+              <span className="h-3 w-3 shrink-0 rounded-sm bg-caution/80" />
             )}
             <span className="min-w-0 flex-1 truncate">{item.name}</span>
             <span
               className={cn(
                 "shrink-0 text-[10px] font-semibold",
-                item.daysUntil <= 1 ? "text-[#ff9500]" : "text-muted"
+                item.daysUntil <= 1 ? "text-caution" : "text-muted"
               )}
             >
               {whenLabel(item.daysUntil)}

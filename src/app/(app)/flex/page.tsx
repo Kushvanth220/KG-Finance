@@ -5,8 +5,6 @@ import { ChevronDown, ChevronLeft, ChevronRight, Clock, Pencil, Play, Plus, Squa
 import { CompactPageShell } from "@/components/ui/compact-page-shell";
 import { GlassCard } from "@/components/ui/glass-card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { FlexDepositsCard } from "@/components/flex/flex-deposits-card";
-import { FlexDayDepositControl, useFlexDayDeposits } from "@/components/flex/flex-day-deposit";
 import { useActiveBlock } from "@/hooks/use-active-block";
 import { zonedClockNow } from "@/lib/zoned-date";
 import { StackedChart, type StackedChartType } from "@/components/charts/stacked-chart";
@@ -48,7 +46,7 @@ const CHARTS: { value: StackedChartType; label: string }[] = [
 ];
 
 const BASE_COLOR = FLEX_BLUE;
-const TIP_COLOR = "#34c759";
+const TIP_COLOR = "var(--success)";
 
 function dateKey(at: Date): string {
   return `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, "0")}-${String(
@@ -279,8 +277,6 @@ export default function FlexPage() {
     }));
   }, [inWindow]);
 
-  const dayDeposits = useFlexDayDeposits(flex, entries);
-
   if (!flex) return null;
 
   const visibleDays = showAllDays ? days : days.slice(0, 7);
@@ -312,7 +308,7 @@ export default function FlexPage() {
               <button
                 type="button"
                 onClick={finishBlock}
-                className="inline-flex items-center gap-1 rounded-lg bg-[#34c759] px-2.5 py-1.5 text-[11px] font-semibold text-white"
+                className="inline-flex items-center gap-1 rounded-lg bg-positive px-2.5 py-1.5 text-[11px] font-semibold text-white"
               >
                 <Square className="h-3 w-3" fill="currentColor" /> Finish · {timer.elapsed}
               </button>
@@ -321,7 +317,7 @@ export default function FlexPage() {
                 onClick={timer.clear}
                 aria-label="Discard the running block"
                 title="Discard"
-                className="hit rounded-lg p-1.5 text-muted hover:bg-black/5 hover:text-[#ff3b30] dark:hover:bg-white/10"
+                className="hit rounded-lg p-1.5 text-muted hover:bg-black/5 hover:text-negative dark:hover:bg-white/10"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -339,8 +335,8 @@ export default function FlexPage() {
               <button
                 type="button"
                 onClick={() => setLogging(true)}
-                className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-white"
-                style={{ background: FLEX_BLUE }}
+                className="glass-pill inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold"
+                style={{ "--pill-tint": FLEX_BLUE } as React.CSSProperties}
               >
                 <Plus className="h-3 w-3" /> Log
               </button>
@@ -350,7 +346,7 @@ export default function FlexPage() {
       }
     >
       <Tilt3D max={6} className="rounded-[var(--card-radius)]">
-      <GlassCard className="!p-3 border-t-[3px] border-t-[#0077FF]">
+      <GlassCard className="!p-3 border-t-[3px] border-t-[#3781fc]">
         <div className="mb-3 flex justify-center">
           <div className="glass flex gap-0.5 rounded-lg p-0.5">
             {PERIODS.map((option) => (
@@ -360,9 +356,9 @@ export default function FlexPage() {
                 onClick={() => setChosen({ period: option.value, offset: 0 })}
                 className={cn(
                   "rounded-md px-2.5 py-1 text-[11px] font-medium transition-all",
-                  period === option.value ? "text-white" : "text-muted"
+                  period === option.value ? "glass-pill" : "text-muted"
                 )}
-                style={period === option.value ? { background: FLEX_BLUE } : undefined}
+                style={period === option.value ? ({ "--pill-tint": FLEX_BLUE } as React.CSSProperties) : undefined}
               >
                 {option.label}
               </button>
@@ -452,13 +448,10 @@ export default function FlexPage() {
       </GlassCard>
       </Tilt3D>
 
-
-      <FlexDepositsCard rule={flex} entries={entries} />
-
       {waitingOnTips.length > 0 ? (
         <GlassCard className="!p-0 overflow-hidden">
-          <div className="border-l-[3px] border-[#ff9500] px-4 py-2.5">
-            <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#ff9500]">
+          <div className="border-l-[3px] border-caution px-4 py-2.5">
+            <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-caution">
               <Clock className="h-3 w-3" /> Tips to confirm ({waitingOnTips.length})
             </p>
           </div>
@@ -507,9 +500,9 @@ export default function FlexPage() {
                 onClick={() => setChart(option.value)}
                 className={cn(
                   "rounded-md px-2 py-0.5 text-[10px] font-medium transition-all",
-                  chart === option.value ? "text-white" : "text-muted"
+                  chart === option.value ? "glass-pill" : "text-muted"
                 )}
-                style={chart === option.value ? { background: FLEX_BLUE } : undefined}
+                style={chart === option.value ? ({ "--pill-tint": FLEX_BLUE } as React.CSSProperties) : undefined}
               >
                 {option.label}
               </button>
@@ -548,38 +541,30 @@ export default function FlexPage() {
               return (
                 <div key={day.date}>
                   {/* One line per DAY. A five-block day was five rows before. */}
-                  <div className="flex items-center gap-2 pr-3 hover:bg-black/[0.03] dark:hover:bg-white/[0.04]">
-                    <button
-                      type="button"
-                      onClick={() => setOpenDay(expanded ? null : day.date)}
-                      className="flex min-w-0 flex-1 items-center gap-3 py-2.5 pl-4 text-left"
-                    >
-                      <ChevronDown
-                        className={cn(
-                          "h-3.5 w-3.5 shrink-0 text-muted transition-transform",
-                          expanded && "rotate-180"
-                        )}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[13px] font-medium">{prettyDate(day.date)}</p>
-                        <p className="text-[10px] text-muted">
-                          {day.list.length} {day.list.length === 1 ? "block" : "blocks"} · {day.hours}h
-                          {day.pending > 0 ? (
-                            <span className="text-[#ff9500]"> · {day.pending} tip pending</span>
-                          ) : null}
-                        </p>
-                      </div>
-                      <p className="shrink-0 text-[14px] font-semibold tabular-nums">
-                        {formatCurrency(day.total)}
-                      </p>
-                    </button>
-                    <FlexDayDepositControl
-                      rule={flex}
-                      date={day.date}
-                      status={dayDeposits.statusFor(day.date)}
-                      today={dayDeposits.today}
+                  <button
+                    type="button"
+                    onClick={() => setOpenDay(expanded ? null : day.date)}
+                    className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
+                  >
+                    <ChevronDown
+                      className={cn(
+                        "h-3.5 w-3.5 shrink-0 text-muted transition-transform",
+                        expanded && "rotate-180"
+                      )}
                     />
-                  </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13px] font-medium">{prettyDate(day.date)}</p>
+                      <p className="text-[10px] text-muted">
+                        {day.list.length} {day.list.length === 1 ? "block" : "blocks"} · {day.hours}h
+                        {day.pending > 0 ? (
+                          <span className="text-caution"> · {day.pending} tip pending</span>
+                        ) : null}
+                      </p>
+                    </div>
+                    <p className="shrink-0 text-[14px] font-semibold tabular-nums">
+                      {formatCurrency(day.total)}
+                    </p>
+                  </button>
 
                   {expanded ? (
                     <div className="bg-black/[0.02] px-4 pb-2 dark:bg-white/[0.03]">
@@ -596,7 +581,7 @@ export default function FlexPage() {
                             <p className="text-[10px] text-muted">
                               Base {formatCurrency(block.base)}
                               {block.tip === null ? (
-                                <span className="text-[#ff9500]"> · tip pending</span>
+                                <span className="text-caution"> · tip pending</span>
                               ) : (
                                 <> · tip {formatCurrency(block.tip)}</>
                               )}
@@ -609,7 +594,7 @@ export default function FlexPage() {
                             type="button"
                             onClick={() => setEditing(block.entry)}
                             aria-label={`Edit the ${block.date} ${block.start} block`}
-                            className="hit shrink-0 rounded-md p-1.5 text-muted hover:bg-black/5 hover:text-[#007aff] dark:hover:bg-white/10"
+                            className="hit shrink-0 rounded-md p-1.5 text-muted hover:bg-black/5 hover:text-accent dark:hover:bg-white/10"
                           >
                             <Pencil className="h-3.5 w-3.5" />
                           </button>
@@ -617,7 +602,7 @@ export default function FlexPage() {
                             type="button"
                             onClick={() => setPendingDelete(block.entry)}
                             aria-label={`Delete the ${block.date} ${block.start} block`}
-                            className="hit shrink-0 rounded-md p-1.5 text-[#ff3b30] hover:bg-black/5 dark:hover:bg-white/10"
+                            className="hit shrink-0 rounded-md p-1.5 text-negative hover:bg-black/5 dark:hover:bg-white/10"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>

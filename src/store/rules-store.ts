@@ -158,6 +158,17 @@ function stamp(): string {
 
 let pushing = false;
 let pushAgain = false;
+/**
+ * The pull in flight, if any.
+ *
+ * Opening a screen fires several triggers at once — the first subscriber,
+ * the tab's `focus`, its `visibilitychange`, and the realtime callback — and
+ * each one used to start its own full download. Five identical 37 KB fetches
+ * left the server at the same instant on a plain page load, none of them
+ * able to send a stamp because none had finished yet. Egress is metered, so
+ * later callers now join the pull already running.
+ */
+let pulling: Promise<void> | null = null;
 
 export const useRulesStore = create<RulesState>()(
   persist(
@@ -292,6 +303,10 @@ export const useRulesStore = create<RulesState>()(
       triggersDueToday: (now) => get().rules.filter((rule) => triggerDueToday(rule, now)),
 
       hydrateFromServer: async () => {
+        // Already pulling: wait on that one rather than asking again.
+        if (pulling) return pulling;
+
+        pulling = (async () => {
         try {
           const remote = await fetchRemoteRules();
           if (!remote) return;
@@ -310,6 +325,13 @@ export const useRulesStore = create<RulesState>()(
           if (shape !== shapeOf(remote)) void get().syncToServer();
         } catch {
           // No cloud, or the table is not created yet — local still works.
+        }
+        })();
+
+        try {
+          await pulling;
+        } finally {
+          pulling = null;
         }
       },
 

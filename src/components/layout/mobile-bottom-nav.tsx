@@ -84,12 +84,12 @@ export function MobileBottomNav() {
                   className={cn(
                     "w-10 h-10 rounded-2xl flex items-center justify-center",
                     syncStatus === "error"
-                      ? "bg-[#ff3b30]/15 text-[#ff3b30]"
+                      ? "bg-negative/15 text-negative"
                       : syncStatus === "syncing"
-                        ? "bg-[#007aff]/15 text-[#007aff]"
+                        ? "bg-accent/15 text-accent"
                         : syncConfigured
-                          ? "bg-[#34c759]/15 text-[#34c759]"
-                          : "bg-[#ff9500]/15 text-[#ff9500]"
+                          ? "bg-positive/15 text-positive"
+                          : "bg-caution/15 text-caution"
                   )}
                 >
                   {syncStatus === "syncing" ? (
@@ -130,7 +130,7 @@ export function MobileBottomNav() {
                       className={cn(
                         "tap-card focus-ring flex flex-col items-center gap-1.5 rounded-xl px-2 py-2.5 text-center",
                         active
-                          ? "bg-[#007aff]/12 ring-1 ring-[#007aff]/25"
+                          ? "bg-accent/12 ring-1 ring-accent/25"
                           : "glass hover:bg-black/5 dark:hover:bg-white/5"
                       )}
                     >
@@ -167,7 +167,7 @@ export function MobileBottomNav() {
                     <span
                       className={cn(
                         "bottom-nav-fab tap-card flex h-14 w-14 items-center justify-center rounded-[22px] text-white shadow-lg",
-                        active && "ring-4 ring-[#007aff]/25"
+                        active && "ring-4 ring-accent/25"
                       )}
                     >
                       <Icon className="h-6 w-6" strokeWidth={2.2} />
@@ -175,7 +175,7 @@ export function MobileBottomNav() {
                     <span
                       className={cn(
                         "mt-1 text-[10px] font-semibold",
-                        active ? "text-[#007aff]" : "text-muted"
+                        active ? "text-accent" : "text-muted"
                       )}
                     >
                       {tab.label}
@@ -194,7 +194,7 @@ export function MobileBottomNav() {
                     className={cn(
                       "flex h-9 w-9 items-center justify-center rounded-2xl transition-all",
                       active
-                        ? "bg-[#007aff]/15 text-[#007aff] scale-105"
+                        ? "bg-accent/15 text-accent scale-105"
                         : "text-muted"
                     )}
                   >
@@ -203,7 +203,7 @@ export function MobileBottomNav() {
                   <span
                     className={cn(
                       "text-[10px] font-medium",
-                      active ? "text-[#007aff] font-semibold" : "text-muted"
+                      active ? "text-accent font-semibold" : "text-muted"
                     )}
                   >
                     {tab.label}
@@ -223,7 +223,7 @@ export function MobileBottomNav() {
                 className={cn(
                   "flex h-9 w-9 items-center justify-center rounded-2xl transition-all",
                   moreActive || moreOpen
-                    ? "bg-[#007aff]/15 text-[#007aff] scale-105"
+                    ? "bg-accent/15 text-accent scale-105"
                     : "text-muted"
                 )}
               >
@@ -232,7 +232,7 @@ export function MobileBottomNav() {
               <span
                 className={cn(
                   "text-[10px] font-medium",
-                  moreActive || moreOpen ? "text-[#007aff] font-semibold" : "text-muted"
+                  moreActive || moreOpen ? "text-accent font-semibold" : "text-muted"
                 )}
               >
                 More

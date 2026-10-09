@@ -44,7 +44,7 @@ function TransactionDetails({
 
   return (
     <div className="rounded-xl bg-black/[0.03] dark:bg-white/[0.03] p-3 space-y-1.5">
-      <p className="text-xs font-semibold text-[#ff3b30]">
+      <p className="text-xs font-semibold text-negative">
         {typeLabels[transaction.type]} · {PERSON_LABELS[actor]}
       </p>
       <p className="text-sm">{getTransactionDisplayMessage(transaction)}</p>
@@ -131,11 +131,11 @@ export function DeletedHistoryCard({ record }: { record: DeletedHistoryRecord })
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[#ff3b30]/15 text-[#ff3b30]">
+            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-negative/15 text-negative">
               Deleted
             </span>
             {record.deletedBy ? (
-              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[#5856d6]/15 text-[#5856d6]">
+              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-indigo/15 text-indigo">
                 By {PERSON_LABELS[record.deletedBy]}
               </span>
             ) : null}
@@ -152,14 +152,14 @@ export function DeletedHistoryCard({ record }: { record: DeletedHistoryRecord })
           )}
         </div>
         {primary && (
-          <span className="font-semibold text-[#ff3b30] shrink-0">
+          <span className="font-semibold text-negative shrink-0">
             -{formatCurrency(primary.amount)}
           </span>
         )}
       </div>
 
       <details className="group">
-        <summary className="text-xs text-[#007aff] cursor-pointer list-none flex items-center gap-1">
+        <summary className="text-xs text-accent cursor-pointer list-none flex items-center gap-1">
           <span className="group-open:rotate-90 transition-transform inline-block">›</span>
           Full deleted details
         </summary>

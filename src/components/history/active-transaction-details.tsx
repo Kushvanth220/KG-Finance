@@ -42,7 +42,7 @@ export function ActiveTransactionDetails({ transaction }: { transaction: Transac
 
   return (
     <details className="group mt-1">
-      <summary className="text-[10px] text-[#007aff] cursor-pointer list-none flex items-center gap-1">
+      <summary className="text-[10px] text-accent cursor-pointer list-none flex items-center gap-1">
         <span className="group-open:rotate-90 transition-transform inline-block">›</span>
         Details
       </summary>

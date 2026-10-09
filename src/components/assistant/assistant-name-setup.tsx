@@ -39,8 +39,8 @@ export function AssistantNameSetup({ onComplete }: AssistantNameSetupProps) {
   return (
     <div className="flex flex-col items-center justify-center px-2 py-4 text-center">
       <GlassCard className="!p-4 w-full max-w-sm space-y-3">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#007aff]/10">
-          <Sparkles className="h-6 w-6 text-[#007aff]" />
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-accent/10">
+          <Sparkles className="h-6 w-6 text-accent" />
         </div>
 
         {step === "ask" ? (
@@ -97,7 +97,7 @@ export function AssistantNameSetup({ onComplete }: AssistantNameSetupProps) {
                   className={cn(
                     "rounded-2xl border px-3 py-2.5 text-xs font-semibold transition-colors",
                     voiceGender === gender
-                      ? "border-[#007aff] bg-[#007aff]/10 text-[#007aff]"
+                      ? "border-accent bg-accent/10 text-accent"
                       : "border-black/10 dark:border-white/10 text-muted"
                   )}
                 >

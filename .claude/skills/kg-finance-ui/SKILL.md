@@ -1,6 +1,6 @@
 ---
-name: ui-ux-pro-max
-description: KG Finance's design standard — glass cards, the iOS palette, Geist type, money and date rules, motion, both themes. Load before building or restyling any page, card, dialog or chart in this app.
+name: kg-finance-ui
+description: KG Finance's house style — glass cards, the iOS palette, Geist type, money and date rules, motion, both themes. Load before building or restyling any page, card, dialog or chart in this app.
 ---
 
 # KG Finance — UI/UX standard
@@ -81,6 +81,11 @@ this is a phone app, not a brochure:
 
 Every figure that sits in a column gets `tabular-nums`. Never use a serif. Never
 centre body text; centre only a headline number and its label.
+
+The one exception is the wordmark: "KG Finance" itself is Cinzel, KG at 800 and
+Finance at 400, chosen by the owners. Always render it with `<Wordmark />` from
+`components/brand/wordmark` (pass `enter` for its blur-to-focus entrance), next to
+the lion (`KgMark`). Never set anything else in Cinzel.
 
 ## 4. Money and dates — non-negotiable
 

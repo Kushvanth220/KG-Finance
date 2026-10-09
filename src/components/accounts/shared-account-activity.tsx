@@ -47,19 +47,19 @@ function PersonActivityRow({
       <div className="grid grid-cols-2 gap-2">
         <div>
           <p className="text-[10px] text-muted flex items-center gap-1">
-            <ArrowDownLeft className="w-3 h-3 text-[#34c759]" />
+            <ArrowDownLeft className="w-3 h-3 text-positive" />
             Earned
           </p>
-          <p className="text-sm font-bold text-[#34c759] tabular-nums">
+          <p className="text-sm font-bold text-positive tabular-nums">
             +{formatCurrency(earnedThisMonth)}
           </p>
         </div>
         <div>
           <p className="text-[10px] text-muted flex items-center gap-1">
-            <ArrowUpRight className="w-3 h-3 text-[#ff3b30]" />
+            <ArrowUpRight className="w-3 h-3 text-negative" />
             Spent
           </p>
-          <p className="text-sm font-bold text-[#ff3b30] tabular-nums">
+          <p className="text-sm font-bold text-negative tabular-nums">
             -{formatCurrency(spentThisMonth)}
           </p>
         </div>
@@ -72,7 +72,7 @@ function PersonActivityRow({
           </span>
           <span
             className={`font-semibold tabular-nums ${
-              adjustmentsThisMonth >= 0 ? "text-[#34c759]" : "text-[#ff3b30]"
+              adjustmentsThisMonth >= 0 ? "text-positive" : "text-negative"
             }`}
           >
             {adjustmentsThisMonth >= 0 ? "+" : "-"}
@@ -84,7 +84,7 @@ function PersonActivityRow({
         <span className="text-muted">Net this month</span>
         <span
           className={`font-semibold tabular-nums ${
-            netThisMonth >= 0 ? "text-[#34c759]" : "text-[#ff3b30]"
+            netThisMonth >= 0 ? "text-positive" : "text-negative"
           }`}
         >
           {netThisMonth >= 0 ? "+" : "-"}
@@ -140,10 +140,10 @@ export function SharedAccountActivity({ accountName }: SharedAccountActivityProp
 
   return (
     <>
-      <div className="rounded-xl border border-[#af52de]/20 bg-[#af52de]/5 px-3 py-2.5 space-y-2">
+      <div className="rounded-xl border border-feature/20 bg-feature/5 px-3 py-2.5 space-y-2">
         <div className="flex items-center justify-between gap-2">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-[#af52de]">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-feature">
               GreenDot · {monthLabel}
             </p>
             {trackingLabel ? (
@@ -182,7 +182,7 @@ export function SharedAccountActivity({ accountName }: SharedAccountActivityProp
             </span>
             <span
               className={`font-semibold tabular-nums ${
-                activity.greenDotAdjustmentsThisMonth >= 0 ? "text-[#34c759]" : "text-[#ff3b30]"
+                activity.greenDotAdjustmentsThisMonth >= 0 ? "text-positive" : "text-negative"
               }`}
             >
               {activity.greenDotAdjustmentsThisMonth >= 0 ? "+" : "-"}
@@ -191,12 +191,12 @@ export function SharedAccountActivity({ accountName }: SharedAccountActivityProp
           </div>
         )}
 
-        <div className="rounded-lg border border-[#af52de]/15 px-2.5 py-2 text-[10px] space-y-1">
+        <div className="rounded-lg border border-feature/15 px-2.5 py-2 text-[10px] space-y-1">
           <div className="flex items-center justify-between">
             <span className="text-muted">Combined net · {monthLabel}</span>
             <span
               className={`font-semibold tabular-nums ${
-                activity.combinedNetThisMonth >= 0 ? "text-[#34c759]" : "text-[#ff3b30]"
+                activity.combinedNetThisMonth >= 0 ? "text-positive" : "text-negative"
               }`}
             >
               {activity.combinedNetThisMonth >= 0 ? "+" : "-"}
@@ -250,7 +250,7 @@ export function SharedAccountActivity({ accountName }: SharedAccountActivityProp
                   </div>
                   <p
                     className={`text-sm font-bold tabular-nums shrink-0 ${
-                      entry.signedAmount >= 0 ? "text-[#34c759]" : "text-[#ff3b30]"
+                      entry.signedAmount >= 0 ? "text-positive" : "text-negative"
                     }`}
                   >
                     {entry.signedAmount >= 0 ? "+" : "-"}
@@ -263,7 +263,7 @@ export function SharedAccountActivity({ accountName }: SharedAccountActivityProp
               <span className="text-muted">Net in this list</span>
               <span
                 className={`font-bold tabular-nums ${
-                  ledgerNet >= 0 ? "text-[#34c759]" : "text-[#ff3b30]"
+                  ledgerNet >= 0 ? "text-positive" : "text-negative"
                 }`}
               >
                 {ledgerNet >= 0 ? "+" : "-"}

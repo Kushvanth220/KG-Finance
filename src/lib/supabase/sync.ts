@@ -280,7 +280,8 @@ function countFinanceRecords(state: FinanceState): number {
     (state.incomeEntries?.length ?? 0) +
     (state.accounts?.length ?? 0) +
     (state.debts?.length ?? 0) +
-    (state.incomeSources?.length ?? 0)
+    (state.incomeSources?.length ?? 0) +
+    (state.remittances?.length ?? 0)
   );
 }
 

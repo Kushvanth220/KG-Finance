@@ -16,7 +16,17 @@ import { ExpenseCategoryDonutChart, IncomeDonutChart } from "@/components/dashbo
 import { SpendCategoryManager } from "@/components/spend/spend-category-manager";
 import { useFinanceStore } from "@/store/finance-store";
 import { useAssistantPreferencesStore } from "@/store/assistant-preferences-store";
-import { getIncomeForPeriod, getPersonExpensesForPeriod } from "@/lib/calculations";
+import {
+  getIncomeForPeriod,
+  getPersonExpensesForPeriod,
+  getTransactionExpenseShare,
+  sumPersonExpenses,
+} from "@/lib/calculations";
+import { NeedsYou, pendingFlexTotal } from "@/components/dashboard/needs-you";
+import { motion, useReducedMotion } from "motion/react";
+import { enterDelay } from "@/lib/motion-presets";
+import { useRulesStore } from "@/store/rules-store";
+import { zonedToday } from "@/lib/zoned-date";
 import { getAccountsForPerson } from "@/lib/accounts";
 import { buildLearnedCategorySpending } from "@/lib/learn-spending-categories";
 import { upcomingFor, whenLabel } from "@/lib/upcoming";
@@ -25,7 +35,8 @@ import { roundMoney } from "@/lib/money";
 import { PERSON_LABELS, type Person } from "@/types";
 import { cn } from "@/lib/utils";
 import { useLiveSync } from "@/hooks/use-live-sync";
-import { Rings3D } from "@/components/art/page-art";
+import { SpendGrid } from "@/components/art/page-art";
+import { Reveal } from "@/components/ui/reveal";
 import { UpcomingStrip } from "@/components/dashboard/upcoming-strip";
 import {
   DateRangeFilter,
@@ -59,7 +70,7 @@ function PeriodDelta({
   const good = up === goodWhenUp;
   const pct = prev > 0 ? Math.round((Math.abs(diff) / prev) * 100) : null;
   return (
-    <span className={cn("text-[10px] font-semibold tabular-nums", good ? "text-[#34c759]" : "text-[#ff3b30]")}>
+    <span className={cn("text-[10px] font-semibold tabular-nums", good ? "text-positive" : "text-negative")}>
       {up ? "▲" : "▼"} {pct !== null && pct <= 999 ? `${pct}%` : formatCurrency(Math.abs(diff))} vs {vs}
     </span>
   );
@@ -73,16 +84,19 @@ function ChartTags({
   items,
   total,
   onPick,
+  showPercent = true,
 }: {
   items: { name: string; amount: number; color: string }[];
   total: number;
   onPick: (name: string) => void;
+  /** The share of the total beside each amount. Off where the amount is the point. */
+  showPercent?: boolean;
 }) {
   if (items.length === 0) return null;
   return (
     <div className="mt-2 flex flex-wrap gap-1.5">
       {items.map((item) => {
-        const pct = total > 0 ? Math.round((item.amount / total) * 100) : 0;
+        const pct = showPercent && total > 0 ? Math.round((item.amount / total) * 100) : 0;
         return (
           <button
             key={item.name}
@@ -93,7 +107,7 @@ function ChartTags({
             <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: item.color }} />
             <span className="max-w-[9rem] truncate text-muted">{item.name}</span>
             <span className="font-semibold tabular-nums">{formatCurrency(item.amount)}</span>
-            <span className="tabular-nums text-muted">{pct}%</span>
+            {showPercent ? <span className="tabular-nums text-muted">{pct}%</span> : null}
           </button>
         );
       })}
@@ -102,8 +116,8 @@ function ChartTags({
 }
 
 const PERSON_ACCENT: Record<Person, string> = {
-  kushvanth: "#007aff",
-  g: "#af52de",
+  kushvanth: "var(--accent)",
+  g: "var(--feature)",
 };
 
 function greetingFor(hour: number): string {
@@ -115,9 +129,13 @@ function greetingFor(hour: number): string {
 
 export function DashboardView() {
   const router = useRouter();
+  const still = useReducedMotion();
   const { incomeEntries, incomeSources, transactions, spendCategories, accounts, monthlyExpenses } =
     useFinanceStore();
   const reminders = useAssistantPreferencesStore((state) => state.structuredReminders);
+  const flexDeposits = useFinanceStore((state) => state.flexDeposits);
+  const ruleList = useRulesStore((state) => state.rules);
+  const ruleEntries = useRulesStore((state) => state.entries);
   const { configured: syncConfigured, isLive, isSyncing, lastSyncedAt } = useLiveSync();
   const [person, setPerson] = useState<Person>("kushvanth");
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
@@ -187,11 +205,7 @@ export function DashboardView() {
     [transactions, person, range]
   );
   const expensePrevTotal = useMemo(
-    () =>
-      getPersonExpensesForPeriod(transactions, person, range.prevStart, range.prevEnd).reduce(
-        (sum, t) => sum + t.amount,
-        0
-      ),
+    () => sumPersonExpenses(transactions, person, range.prevStart, range.prevEnd),
     [transactions, person, range]
   );
 
@@ -208,15 +222,75 @@ export function DashboardView() {
     [transactions, person, spendCategories, expensesInRange, range]
   );
 
-  const { spent: spentCategories, skipped: skippedCategories } = categoryInsights;
+  const {
+    spent: spentCategories,
+    skipped: skippedCategories,
+    offsets: spendOffsets,
+    unmapped: unmappedSpend,
+  } = categoryInsights;
 
-  const spendTotal = useMemo(
+  /** What the chart can draw: the categories with money in them. */
+  const slicesTotal = useMemo(
     () => spentCategories.reduce((sum, item) => sum + item.amount, 0),
     [spentCategories]
   );
 
-  // The dial reads the same rows the spending panel does.
-  const dialSpend = useMemo(() => expensesInRange.reduce((sum, t) => sum + t.amount, 0), [expensesInRange]);
+  /**
+   * What was actually spent.
+   *
+   * The slices, plus the refunds no chart can draw as a slice. Counting only
+   * the drawable part is how this figure came to claim $115 more spending
+   * than the ledger held: a refunded category simply vanished. Both parts are
+   * shown, so the breakdown and the headline reconcile on screen.
+   */
+  const spendTotal = useMemo(
+    () =>
+      roundMoney(
+        slicesTotal +
+          spendOffsets.reduce((sum, item) => sum + item.amount, 0) +
+          unmappedSpend
+      ),
+    [slicesTotal, spendOffsets, unmappedSpend]
+  );
+
+  // The dial and the spending panel are the same rows, so they are the same
+  // number — both this person's SHARE, never the face value of a shared bill.
+  const dialSpend = spendTotal;
+
+  // Money earned in this period whose payout has not landed yet, so the
+  // verdict is not "you overspent" on a month that is only awaiting a deposit.
+  const pendingIncome = useMemo(() => {
+    if (person !== "kushvanth") return 0;
+    return pendingFlexTotal(ruleList, ruleEntries, flexDeposits ?? [], incomeEntries, incomeSources, zonedToday()).total;
+  }, [person, ruleList, ruleEntries, flexDeposits, incomeEntries, incomeSources]);
+
+  /**
+   * The mark beside the greeting: this person's spend per day for the last
+   * sixteen days. Deliberately NOT tied to the range filter above — the mark
+   * answers "how have the last two weeks gone", which stays useful while you
+   * page back through old months.
+   */
+  const recentDays = useMemo(() => {
+    const anchor = new Date(`${zonedToday()}T12:00:00`);
+    const out: { date: string; amount: number }[] = [];
+    for (let back = 15; back >= 0; back--) {
+      const at = new Date(anchor);
+      at.setDate(at.getDate() - back);
+      out.push({
+        date: `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, "0")}-${String(at.getDate()).padStart(2, "0")}`,
+        amount: 0,
+      });
+    }
+
+    const slot = new Map(out.map((day, index) => [day.date, index]));
+    for (const transaction of transactions) {
+      if (transaction.type !== "expense") continue;
+      const index = slot.get(transaction.date);
+      if (index === undefined) continue;
+      out[index]!.amount += getTransactionExpenseShare(transaction, person);
+    }
+    return out;
+  }, [transactions, person]);
 
   const budgeted = useMemo(() => spendCategories.filter((c) => (c.budget ?? 0) > 0), [spendCategories]);
 
@@ -232,23 +306,31 @@ export function DashboardView() {
     router.push(`/history?${params.toString()}`);
   };
 
+  /**
+   * Cards used to enter on mount, all of them, including the six below the
+   * fold that finished before anyone scrolled down. Now each one enters as it
+   * is reached — see `Reveal`. The delay is kept only for the first few,
+   * which are on screen at load and have no scroll to stagger them.
+   */
+  const section = (index: number) => ({ delay: index < 3 ? enterDelay(index, 0.06) : 0 });
+
   return (
-    <div className="space-y-3 pb-4 max-w-lg mx-auto">
+    <motion.div layout={still ? false : "position"} className="space-y-3 pb-4 max-w-lg mx-auto">
       {/* One greeting, one line that matters. Everything below is detail. */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2.5">
-          <Rings3D size={36} />
+          <SpendGrid days={recentDays} size={36} />
           <div className="min-w-0">
             <h1 className="text-lg font-bold leading-tight">
               {greeting}, {PERSON_LABELS[person]}
             </h1>
             <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-muted">
-              <span className="font-semibold text-[#34c759] tabular-nums">{formatCurrency(available)}</span>
+              <span className="font-semibold text-positive tabular-nums">{formatCurrency(available)}</span>
               <span>available</span>
               {nextDue ? (
                 <>
                   <span aria-hidden>·</span>
-                  <span className={cn(nextDue.daysUntil <= 1 && "font-semibold text-[#ff9500]")}>
+                  <span className={cn(nextDue.daysUntil <= 1 && "font-semibold text-caution")}>
                     {nextDue.name} {whenLabel(nextDue.daysUntil).toLowerCase()}
                   </span>
                 </>
@@ -258,9 +340,9 @@ export function DashboardView() {
                   className={cn(
                     "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-semibold",
                     isLive && !isSyncing
-                      ? "bg-[#34c759]/15 text-[#34c759]"
+                      ? "bg-positive/15 text-positive"
                       : isSyncing
-                        ? "bg-[#007aff]/15 text-[#007aff]"
+                        ? "bg-accent/15 text-accent"
                         : "bg-black/5 text-muted dark:bg-white/10"
                   )}
                   title={
@@ -272,7 +354,7 @@ export function DashboardView() {
                   {isSyncing ? (
                     <Loader2 className="w-2.5 h-2.5 animate-spin" />
                   ) : (
-                    <span className={cn("w-1.5 h-1.5 rounded-full", isLive ? "bg-[#34c759]" : "bg-muted")} />
+                    <span className={cn("w-1.5 h-1.5 rounded-full", isLive ? "bg-positive" : "bg-muted")} />
                   )}
                   {isSyncing ? "Syncing" : isLive ? "Live" : "Sync"}
                 </span>
@@ -290,180 +372,242 @@ export function DashboardView() {
         </Link>
       </div>
 
+      <Reveal {...section(0)}>
       <PersonTabs
         value={person}
         onChange={setPerson}
         className="!rounded-xl !p-0.5 [&_button]:py-1.5 [&_button]:text-xs"
       />
 
-      <DateRangeFilter value={rangeChoice} onChange={setRangeChoice} accent={accent} />
+      </Reveal>
 
-      <PeriodStory income={incomeTotal} spend={dialSpend} start={range.start} end={range.end} label={range.label} />
+      <Reveal {...section(1)}>
+        <DateRangeFilter value={rangeChoice} onChange={setRangeChoice} accent={accent} />
+      </Reveal>
 
-      <DueBills person={person} />
-      <UpcomingStrip person={person} />
+      <Reveal {...section(2)}>
+      <PeriodStory
+        income={incomeTotal}
+        spend={dialSpend}
+        pending={pendingIncome}
+        start={range.start}
+        end={range.end}
+        label={range.label}
+      />
+      </Reveal>
+
+      <Reveal {...section(3)}>
+        <NeedsYou person={person} />
+      </Reveal>
+      <Reveal>
+        <DueBills person={person} />
+      </Reveal>
+      <Reveal>
+        <UpcomingStrip person={person} />
+      </Reveal>
 
       {/* Reads the same store the Accounts page writes to, so the two agree. */}
-      <AccountBalances person={person} />
+      <Reveal {...section(4)}>
+        <AccountBalances person={person} />
+      </Reveal>
 
       {/* Income: the headline, the delta, one chart in the shape the user picked. */}
-      <GlassCard strong className="!p-3 border border-[#34c759]/20">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="flex items-center gap-1.5 text-xs font-semibold">
-              <TrendingUp className="w-3.5 h-3.5 text-[#34c759]" /> Income
-              <span className="truncate font-normal text-muted">· {range.short}</span>
-            </p>
-            <AnimatedMoney
-              value={incomeTotal}
-              prefix="+"
-              className="block text-xl font-bold text-[#34c759] kg-figure"
-            />
-            <PeriodDelta now={incomeTotal} prev={incomePrevTotal} vs={range.prevLabel} goodWhenUp />
-          </div>
-          <button
-            type="button"
-            onClick={() => openIncomeHistory()}
-            className="hit shrink-0 text-[10px] font-medium text-[#007aff]"
-          >
-            View all
-          </button>
-        </div>
-
-        <div className="my-2">
-          <ChartTypePicker value={incomeChart} onChange={setIncomeChart} tint="#34c759" />
-        </div>
-        {incomeBySource.length === 0 ? (
-          <p className="text-[11px] text-muted text-center py-6">No income in this period</p>
-        ) : incomeChart === "donut" ? (
-          <IncomeDonutChart
-            segments={incomeBySource}
-            onSliceClick={(source) => openIncomeHistory(source)}
-            onCenterClick={() => openIncomeHistory()}
-          />
-        ) : (
-          <>
-            <FlexChart
-              type={incomeChart}
-              data={incomeBySource.map((item) => ({ label: item.name, value: item.amount }))}
-              height={190}
-              emptyMessage="No income recorded yet"
-            />
-            <ChartTags
-              items={incomeBySource.map((item, index) => ({ ...item, color: chartColor(index) }))}
-              total={incomeTotal}
-              onPick={(source) => openIncomeHistory(source)}
-            />
-          </>
-        )}
-      </GlassCard>
-
-      {/* Spending: the headline, the delta, one chart. */}
-      <GlassCard strong className="!p-3 border border-[#ff3b30]/20">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="flex items-center gap-1.5 text-xs font-semibold">
-              <Receipt className="w-3.5 h-3.5 text-[#ff3b30]" /> Spending
-              <span className="truncate font-normal text-muted">· {range.short}</span>
-            </p>
-            <AnimatedMoney value={spendTotal} className="block text-xl font-bold text-[#ff3b30] kg-figure" />
-            <PeriodDelta now={spendTotal} prev={expensePrevTotal} vs={range.prevLabel} goodWhenUp={false} />
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
+      <Reveal>
+        <GlassCard strong className="!p-3 border border-positive/20">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="flex items-center gap-1.5 text-xs font-semibold">
+                <TrendingUp className="w-3.5 h-3.5 text-positive" /> Income
+                <span className="truncate font-normal text-muted">· {range.short}</span>
+              </p>
+              <AnimatedMoney
+                value={incomeTotal}
+                prefix="+"
+                className="block text-xl font-bold text-positive kg-figure"
+              />
+              <PeriodDelta now={incomeTotal} prev={incomePrevTotal} vs={range.prevLabel} goodWhenUp />
+            </div>
             <button
               type="button"
-              onClick={() => setCategoryManagerOpen(true)}
-              className="hit inline-flex items-center gap-1 text-[10px] font-medium text-[#007aff]"
-            >
-              <Pencil className="w-3 h-3" /> Edit
-            </button>
-            <button
-              type="button"
-              onClick={() => openCategoryHistory()}
-              className="hit text-[10px] font-medium text-[#007aff]"
+              onClick={() => openIncomeHistory()}
+              className="hit shrink-0 text-[10px] font-medium text-accent"
             >
               View all
             </button>
           </div>
-        </div>
 
-        <div className="my-2">
-          <ChartTypePicker value={spendChart} onChange={setSpendChart} tint="#ff3b30" />
-        </div>
-        {spentCategories.length === 0 ? (
-          <p className="text-[11px] text-muted text-center py-8">No spending in this period</p>
-        ) : spendChart === "donut" ? (
-          <ExpenseCategoryDonutChart
-            compact
-            segments={spentCategories.map((item) => ({ name: item.name, amount: item.amount }))}
-            onSliceClick={(category) => openCategoryHistory(category)}
-            onCenterClick={() => openCategoryHistory()}
-          />
-        ) : (
-          <>
-            <FlexChart
-              type={spendChart}
-              data={spentCategories.map((item) => ({ label: item.name, value: item.amount }))}
-              height={190}
-              emptyMessage="Nothing spent in this period"
+          <div className="my-2">
+            <ChartTypePicker value={incomeChart} onChange={setIncomeChart} tint="var(--success)" />
+          </div>
+          {incomeBySource.length === 0 ? (
+            <p className="text-[11px] text-muted text-center py-6">No income in this period</p>
+          ) : incomeChart === "donut" ? (
+            <IncomeDonutChart
+              segments={incomeBySource}
+              onSliceClick={(source) => openIncomeHistory(source)}
+              onCenterClick={() => openIncomeHistory()}
             />
-            <ChartTags
-              items={spentCategories.map((item, index) => ({ name: item.name, amount: item.amount, color: chartColor(index) }))}
-              total={spendTotal}
-              onPick={(category) => openCategoryHistory(category)}
-            />
-          </>
-        )}
+          ) : (
+            <>
+              <FlexChart
+                type={incomeChart}
+                data={incomeBySource.map((item) => ({ label: item.name, value: item.amount }))}
+                height={190}
+                emptyMessage="No income recorded yet"
+              />
+              <ChartTags
+                items={incomeBySource.map((item, index) => ({ ...item, color: chartColor(index) }))}
+                total={incomeTotal}
+                onPick={(source) => openIncomeHistory(source)}
+              />
+            </>
+          )}
+        </GlassCard>
+      </Reveal>
 
-        {/* Budgeted categories against their budgets — a budget is a monthly
-            promise, so only when the range sits inside one month. */}
-        {range.singleMonth && budgeted.length > 0 ? (
-          <div className="mt-2 space-y-1.5 border-t border-black/5 pt-2 dark:border-white/10">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">
-              Budgets · {format(range.start, "MMMM")}
-            </p>
-            {budgeted.map((c) => (
+      {/* Spending: the headline, the delta, one chart. */}
+      <Reveal>
+        <GlassCard strong className="!p-3 border border-negative/20">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="flex items-center gap-1.5 text-xs font-semibold">
+                <Receipt className="w-3.5 h-3.5 text-negative" /> Spending
+                <span className="truncate font-normal text-muted">· {range.short}</span>
+              </p>
+              <AnimatedMoney value={spendTotal} className="block text-xl font-bold text-negative kg-figure" />
+              <PeriodDelta now={spendTotal} prev={expensePrevTotal} vs={range.prevLabel} goodWhenUp={false} />
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
               <button
-                key={`budget-${c.id}`}
                 type="button"
-                onClick={() => openCategoryHistory(c.name)}
-                className="block w-full px-1 text-left"
+                onClick={() => setCategoryManagerOpen(true)}
+                className="hit inline-flex items-center gap-1 text-[10px] font-medium text-accent"
               >
-                <p className="text-[10px] font-medium">{c.name}</p>
-                <BudgetBar spent={categorySpentThisMonth(transactions, c.name, range.start)} budget={c.budget!} />
+                <Pencil className="w-3 h-3" /> Edit
               </button>
-            ))}
+              <button
+                type="button"
+                onClick={() => openCategoryHistory()}
+                className="hit text-[10px] font-medium text-accent"
+              >
+                View all
+              </button>
+            </div>
           </div>
-        ) : null}
 
-        {skippedCategories.length > 0 && (
-          <div className="mt-2 border-t border-black/5 pt-2 dark:border-white/10">
-            <button
-              type="button"
-              onClick={() => setUnusedOpen((v) => !v)}
-              className="hit inline-flex items-center gap-1 text-[10px] font-medium text-muted"
-              aria-expanded={unusedOpen}
-            >
-              {skippedCategories.length} {skippedCategories.length === 1 ? "category" : "categories"} unused in this period
-              <ChevronDown className={cn("h-3 w-3 transition-transform", unusedOpen && "rotate-180")} />
-            </button>
-            {unusedOpen ? (
-              <div className="mt-1.5 flex flex-wrap gap-1">
-                {skippedCategories.map((name) => (
-                  <span
-                    key={name}
-                    className="rounded-full bg-black/5 px-2 py-0.5 text-[10px] text-muted dark:bg-white/10"
-                  >
-                    {name}
+          <div className="my-2">
+            <ChartTypePicker value={spendChart} onChange={setSpendChart} tint="var(--danger)" />
+          </div>
+          {spentCategories.length === 0 ? (
+            <p className="text-[11px] text-muted text-center py-8">No spending in this period</p>
+          ) : spendChart === "donut" ? (
+            <ExpenseCategoryDonutChart
+              compact
+              segments={spentCategories.map((item) => ({ name: item.name, amount: item.amount }))}
+              onSliceClick={(category) => openCategoryHistory(category)}
+              onCenterClick={() => openCategoryHistory()}
+            />
+          ) : (
+            <>
+              <FlexChart
+                type={spendChart}
+                data={spentCategories.map((item) => ({ label: item.name, value: item.amount }))}
+                height={190}
+                emptyMessage="Nothing spent in this period"
+              />
+              <ChartTags
+                items={spentCategories.map((item, index) => ({ name: item.name, amount: item.amount, color: chartColor(index) }))}
+                total={slicesTotal}
+                showPercent={false}
+                onPick={(category) => openCategoryHistory(category)}
+              />
+            </>
+          )}
+
+          {/* The part no chart can draw. Without this line the slices add up to
+              more than the figure above them, and neither looks wrong on its own. */}
+          {spendOffsets.length > 0 || unmappedSpend !== 0 ? (
+            <div className="mt-2 space-y-1 border-t border-black/5 pt-2 dark:border-white/10">
+              {spendOffsets.map((item) => (
+                <button
+                  key={`offset-${item.name}`}
+                  type="button"
+                  onClick={() => openCategoryHistory(item.name)}
+                  className="hit flex w-full items-center justify-between gap-2 text-[11px]"
+                >
+                  <span className="truncate text-muted">{item.name} · refunded</span>
+                  <span className="shrink-0 font-semibold tabular-nums text-positive">
+                    {formatCurrency(item.amount)}
                   </span>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        )}
-      </GlassCard>
+                </button>
+              ))}
+              {unmappedSpend !== 0 ? (
+                <button
+                  type="button"
+                  onClick={() => openCategoryHistory()}
+                  className="hit flex w-full items-center justify-between gap-2 text-[11px]"
+                >
+                  <span className="truncate text-muted">Uncategorised</span>
+                  <span className="shrink-0 font-semibold tabular-nums">
+                    {formatCurrency(unmappedSpend)}
+                  </span>
+                </button>
+              ) : null}
+            </div>
+          ) : null}
 
-      <DebtsSummary person={person} />
+          {/* Budgeted categories against their budgets — a budget is a monthly
+              promise, so only when the range sits inside one month. */}
+          {range.singleMonth && budgeted.length > 0 ? (
+            <div className="mt-2 space-y-1.5 border-t border-black/5 pt-2 dark:border-white/10">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">
+                Budgets · {format(range.start, "MMMM")}
+              </p>
+              {budgeted.map((c) => (
+                <button
+                  key={`budget-${c.id}`}
+                  type="button"
+                  onClick={() => openCategoryHistory(c.name)}
+                  className="block w-full px-1 text-left"
+                >
+                  <p className="text-[10px] font-medium">{c.name}</p>
+                  <BudgetBar spent={categorySpentThisMonth(transactions, c.name, range.start)} budget={c.budget!} />
+                </button>
+              ))}
+            </div>
+          ) : null}
+
+          {skippedCategories.length > 0 && (
+            <div className="mt-2 border-t border-black/5 pt-2 dark:border-white/10">
+              <button
+                type="button"
+                onClick={() => setUnusedOpen((v) => !v)}
+                className="hit inline-flex items-center gap-1 text-[10px] font-medium text-muted"
+                aria-expanded={unusedOpen}
+              >
+                {skippedCategories.length} {skippedCategories.length === 1 ? "category" : "categories"} unused in this period
+                <ChevronDown className={cn("h-3 w-3 transition-transform", unusedOpen && "rotate-180")} />
+              </button>
+              {unusedOpen ? (
+                <div className="mt-1.5 flex flex-wrap gap-1">
+                  {skippedCategories.map((name) => (
+                    <span
+                      key={name}
+                      className="rounded-full bg-black/5 px-2 py-0.5 text-[10px] text-muted dark:bg-white/10"
+                    >
+                      {name}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          )}
+        </GlassCard>
+      </Reveal>
+
+      <Reveal {...section(6)}>
+        <DebtsSummary person={person} />
+      </Reveal>
 
       {/* Anything a rule collects, shown where the user already looks. */}
       <RuleDashboards person={person} />
@@ -472,6 +616,6 @@ export function DashboardView() {
         open={categoryManagerOpen}
         onClose={() => setCategoryManagerOpen(false)}
       />
-    </div>
+    </motion.div>
   );
 }

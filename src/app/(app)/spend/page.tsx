@@ -612,7 +612,7 @@ export default function SpendPage() {
       <div key={person} className="space-y-1.5">
         <p className="text-xs font-medium px-1 flex items-center justify-between">
           {PERSON_LABELS[person]} · {formatCurrency(paidByMode === "split" ? share : parsedAmount)}
-          {done && <span className="text-[#34c759] text-[10px]">✓</span>}
+          {done && <span className="text-positive text-[10px]">✓</span>}
         </p>
         {(!done || paidByMode !== "split") && (
           <>
@@ -641,7 +641,7 @@ export default function SpendPage() {
                   <Wallet className="w-3.5 h-3.5 inline mr-1.5" />
                   {a.name}
                   {isSharedAccount(a) ? (
-                    <span className="ml-1 text-[10px] text-[#af52de]">· Shared</span>
+                    <span className="ml-1 text-[10px] text-feature">· Shared</span>
                   ) : null}
                 </span>
                 <span className="text-[11px] text-muted">{formatCurrency(a.balance)}</span>
@@ -687,7 +687,7 @@ export default function SpendPage() {
   const segment = (active: boolean) =>
     cn(
       "flex-1 py-1.5 rounded-lg text-[11px] font-medium transition-all",
-      active ? "bg-[#007aff] text-white" : "text-muted"
+      active ? "glass-pill" : "text-muted"
     );
 
   // What the saved spend did to the account(s) and to Balance.
@@ -709,7 +709,7 @@ export default function SpendPage() {
           <button
             type="button"
             onClick={reset}
-            className="hit text-[10px] text-[#007aff] font-medium px-2 py-1"
+            className="hit text-[10px] text-accent font-medium px-2 py-1"
           >
             Cancel
           </button>
@@ -723,7 +723,7 @@ export default function SpendPage() {
               key={n}
               className={cn(
                 "h-1 flex-1 rounded-full",
-                currentStep >= n ? "bg-[#007aff]" : "bg-black/10 dark:bg-white/10"
+                currentStep >= n ? "bg-accent" : "bg-black/10 dark:bg-white/10"
               )}
             />
           ))}
@@ -746,10 +746,10 @@ export default function SpendPage() {
             className="space-y-3"
           >
       {step === "details" && notice ? (
-        <div className="flex items-center gap-2 rounded-xl border border-[#34c759]/30 bg-[#34c759]/10 px-3 py-2 text-[12px]">
-          <RotateCcw className="h-3.5 w-3.5 shrink-0 text-[#34c759]" />
+        <div className="flex items-center gap-2 rounded-xl border border-positive/30 bg-positive/10 px-3 py-2 text-[12px]">
+          <RotateCcw className="h-3.5 w-3.5 shrink-0 text-positive" />
           <span className="flex-1">{notice}</span>
-          <button type="button" onClick={() => setNotice(null)} className="text-[11px] font-semibold text-[#007aff]">
+          <button type="button" onClick={() => setNotice(null)} className="text-[11px] font-semibold text-accent">
             OK
           </button>
         </div>
@@ -762,7 +762,7 @@ export default function SpendPage() {
               <button
                 type="button"
                 onClick={openDatePicker}
-                className="hit inline-flex items-center gap-1 rounded-lg px-1.5 py-0.5 text-[11px] font-medium text-[#007aff] hover:bg-black/5 dark:hover:bg-white/10"
+                className="hit inline-flex items-center gap-1 rounded-lg px-1.5 py-0.5 text-[11px] font-medium text-accent hover:bg-black/5 dark:hover:bg-white/10"
               >
                 <CalendarDays className="h-3.5 w-3.5" />
                 {dateLabel}
@@ -789,7 +789,7 @@ export default function SpendPage() {
                 onClick={() => handleRefundChange(false)}
                 className={cn(
                   "inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-medium transition-all",
-                  !refund ? "bg-[#007aff] text-white shadow-sm" : "text-muted"
+                  !refund ? "bg-accent text-white shadow-sm" : "text-muted"
                 )}
               >
                 <ArrowUpRight className="h-3 w-3" /> Spent
@@ -801,7 +801,7 @@ export default function SpendPage() {
                 onClick={() => handleRefundChange(true)}
                 className={cn(
                   "inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-medium transition-all",
-                  refund ? "bg-[#34c759] text-white shadow-sm" : "text-muted"
+                  refund ? "bg-positive text-white shadow-sm" : "text-muted"
                 )}
               >
                 <ArrowDownLeft className="h-3 w-3" /> Refund
@@ -811,7 +811,7 @@ export default function SpendPage() {
 
           <div>
             <div className="flex items-baseline justify-center gap-1 py-0.5">
-              <span className={cn("text-2xl font-light", refund ? "text-[#34c759]" : "text-muted")}>
+              <span className={cn("text-2xl font-light", refund ? "text-positive" : "text-muted")}>
                 {refund ? "+$" : "$"}
               </span>
               <input
@@ -833,7 +833,7 @@ export default function SpendPage() {
                 className={cn(
                   "max-w-full bg-transparent text-center font-bold tabular-nums outline-none transition-[font-size] duration-150",
                   amountSize,
-                  refund && "text-[#34c759]"
+                  refund && "text-positive"
                 )}
                 aria-label="Amount"
                 autoFocus
@@ -844,7 +844,7 @@ export default function SpendPage() {
                 aria-label="Add another item"
                 title="Add another item to the same receipt"
                 className={cn(
-                  "hit ml-1 flex h-7 w-7 items-center justify-center rounded-full glass text-[#007aff] transition-opacity",
+                  "hit ml-1 flex h-7 w-7 items-center justify-center rounded-full glass text-accent transition-opacity",
                   amount.trim() === "" && "opacity-40"
                 )}
               >
@@ -855,7 +855,7 @@ export default function SpendPage() {
               <p className="text-center text-xs text-muted tabular-nums">= {formatCurrency(parsedAmount)}</p>
             ) : null}
             {refund ? (
-              <p className="text-center text-[10px] text-[#34c759]">Goes back into the account it came from</p>
+              <p className="text-center text-[10px] text-positive">Goes back into the account it came from</p>
             ) : null}
           </div>
 
@@ -869,11 +869,11 @@ export default function SpendPage() {
               onFocus={() => setNotesFocused(true)}
               onBlur={() => setNotesFocused(false)}
               placeholder="What was it? e.g. Groceries at Costco"
-              className="w-full glass rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#007aff]/40"
+              className="w-full glass-field rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent/40"
               autoComplete="off"
             />
             {suggestions.length > 0 ? (
-              <div className="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-xl border border-black/10 bg-white shadow-lg dark:border-white/10 dark:bg-[#1c1c1e]">
+              <div className="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-xl border border-black/10 bg-white shadow-lg dark:border-white/10 dark:bg-[#03195b]">
                 {suggestions.map((item) => (
                   <button
                     key={item.note}
@@ -895,7 +895,7 @@ export default function SpendPage() {
 
           <div className="space-y-2">
             {selection?.categoryId && (
-              <div className="rounded-xl border border-[#34c759]/30 bg-[#34c759]/10 px-3 py-2 flex items-center justify-between gap-2">
+              <div className="rounded-xl border border-positive/30 bg-positive/10 px-3 py-2 flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold truncate">
                     {selectedCategory ? `${categoryLook(selectedCategory).emoji} ` : ""}
@@ -909,7 +909,7 @@ export default function SpendPage() {
                     setSelection(null);
                     setManualCategoryPick(false);
                   }}
-                  className="text-[11px] text-[#007aff] font-medium shrink-0"
+                  className="text-[11px] text-accent font-medium shrink-0"
                 >
                   Change
                 </button>
@@ -921,7 +921,7 @@ export default function SpendPage() {
               <button
                 type="button"
                 onClick={() => setManageOpen(true)}
-                className="text-[11px] text-[#007aff] font-medium"
+                className="text-[11px] text-accent font-medium"
               >
                 Manage categories
               </button>
@@ -952,7 +952,7 @@ export default function SpendPage() {
               <button
                 type="button"
                 onClick={() => setAllCategories((v) => !v)}
-                className="hit flex w-full items-center justify-center gap-1 py-1 text-[11px] font-semibold text-[#007aff]"
+                className="hit flex w-full items-center justify-center gap-1 py-1 text-[11px] font-semibold text-accent"
               >
                 {categoriesOpen ? "Show fewer" : `Show all ${orderedCategories.all.length}`}
                 <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", categoriesOpen && "rotate-180")} />
@@ -1000,8 +1000,8 @@ export default function SpendPage() {
           </div>
 
           {balancePreview && balancePreview.length > 0 && (
-            <div className="rounded-xl bg-[#af52de]/5 border border-[#af52de]/20 px-3 py-2">
-              <p className="text-[10px] font-semibold text-[#af52de] mb-0.5">Balance</p>
+            <div className="rounded-xl bg-feature/5 border border-feature/20 px-3 py-2">
+              <p className="text-[10px] font-semibold text-feature mb-0.5">Balance</p>
               {balancePreview.map((line) => (
                 <p key={line} className="text-xs leading-snug">
                   {line}
@@ -1066,7 +1066,7 @@ export default function SpendPage() {
         <div className="space-y-3">
           <GlassCard className="text-center py-2 px-3">
             <p className="text-xs text-muted truncate">{categoryLabel}{isToday ? "" : ` · ${dateLabel}`}</p>
-            <p className={cn("text-2xl font-bold tabular-nums", refund && "text-[#34c759]")}>
+            <p className={cn("text-2xl font-bold tabular-nums", refund && "text-positive")}>
               {refund ? "+" : ""}{formatCurrency(parsedAmount)}
             </p>
             <p className="text-[11px] text-muted mt-0.5">
@@ -1153,7 +1153,7 @@ export default function SpendPage() {
               <span className="truncate text-muted">
                 {betweenNow.amount > 0 ? betweenNow.label.replace(" should pay ", " owes ").replace(" back", "") : "Balance"}
               </span>
-              <span className="font-semibold tabular-nums text-[#af52de]">
+              <span className="font-semibold tabular-nums text-feature">
                 {betweenNow.amount > 0 ? formatCurrency(betweenNow.amount) : "settled"}
               </span>
             </p>
@@ -1163,7 +1163,7 @@ export default function SpendPage() {
             <button
               type="button"
               onClick={undo}
-              className="hit inline-flex items-center gap-1.5 rounded-xl border border-[#ff9500]/40 bg-[#ff9500]/10 px-3 py-1.5 text-[12px] font-semibold text-[#ff9500]"
+              className="hit inline-flex items-center gap-1.5 rounded-xl border border-caution/40 bg-caution/10 px-3 py-1.5 text-[12px] font-semibold text-caution"
             >
               <Undo2 className="h-3.5 w-3.5" /> Undo · {undoLeft}s
             </button>
@@ -1261,7 +1261,7 @@ function CompactSplitInputs({
             value={kushValue}
             onChange={(e) => onKushChange(e.target.value)}
             placeholder="0"
-            className="glass rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[#007aff]/40"
+            className="glass rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-accent/40"
           />
         </label>
         <label className="flex flex-col gap-1">
@@ -1273,7 +1273,7 @@ function CompactSplitInputs({
             value={gValue}
             onChange={(e) => onGChange(e.target.value)}
             placeholder="0"
-            className="glass rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[#007aff]/40"
+            className="glass rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-accent/40"
           />
         </label>
       </div>
@@ -1284,19 +1284,19 @@ function CompactSplitInputs({
               {formatCurrency(kushAmt + gAmt)} / {formatCurrency(total)}
             </span>
             {!valid ? (
-              <span className="text-[#ff3b30] font-medium">
+              <span className="text-negative font-medium">
                 {remaining > 0
                   ? `${formatCurrency(remaining)} left`
                   : `${formatCurrency(Math.abs(remaining))} over`}
               </span>
             ) : (
-              <span className="text-[#34c759] font-medium">✓</span>
+              <span className="text-positive font-medium">✓</span>
             )}
           </div>
           <button
             type="button"
             onClick={onEvenSplit}
-            className="text-[10px] text-[#007aff] font-medium px-0.5"
+            className="text-[10px] text-accent font-medium px-0.5"
           >
             {(() => {
               const [a, b] = splitMoney(total, 2);

@@ -3,7 +3,7 @@
 import { useEffect, useMemo } from "react";
 import { useBalanceCelebrationStore } from "@/store/balance-celebration-store";
 
-const CONFETTI_COLORS = ["#007aff", "#5856d6", "#af52de", "#ff2d55", "#ff9500", "#34c759", "#ffcc00"];
+const CONFETTI_COLORS = ["var(--accent)", "var(--accent-secondary)", "var(--feature)", "var(--pink)", "var(--warning)", "var(--success)", "#ffd27a"];
 
 function ConfettiPiece({ index, seed }: { index: number; seed: string }) {
   const style = useMemo(() => {

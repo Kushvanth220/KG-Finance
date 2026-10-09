@@ -55,23 +55,20 @@ export function GlassButton({
   }, []);
 
   const variants = {
-    primary:
-      "bg-[#007aff] text-white shadow-lg shadow-[#007aff]/25 hover:bg-[#0a86ff] hover:shadow-xl hover:shadow-[#007aff]/35",
+    primary: "glass-pill hover:brightness-110",
     secondary:
       "glass text-foreground hover:bg-white/80 dark:hover:bg-white/10 hover:shadow-md",
-    danger:
-      "bg-[#ff3b30] text-white shadow-lg shadow-[#ff3b30]/25 hover:bg-[#ff4d43] hover:shadow-xl hover:shadow-[#ff3b30]/35",
-    success:
-      "bg-[#34c759] text-white shadow-lg shadow-[#34c759]/25 hover:bg-[#3ad364] hover:shadow-xl hover:shadow-[#34c759]/35",
+    danger: "glass-pill [--pill-tint:var(--danger)] hover:brightness-110",
+    success: "glass-pill [--pill-tint:var(--success)] hover:brightness-110",
     ghost: "bg-transparent hover:bg-black/5 dark:hover:bg-white/8",
   };
 
   const focusRing = {
-    primary: "focus-visible:ring-[#007aff]/50",
-    secondary: "focus-visible:ring-[#007aff]/40",
-    danger: "focus-visible:ring-[#ff3b30]/50",
-    success: "focus-visible:ring-[#34c759]/50",
-    ghost: "focus-visible:ring-[#007aff]/40",
+    primary: "focus-visible:ring-accent/50",
+    secondary: "focus-visible:ring-accent/40",
+    danger: "focus-visible:ring-negative/50",
+    success: "focus-visible:ring-positive/50",
+    ghost: "focus-visible:ring-accent/40",
   };
 
   const sizes = {

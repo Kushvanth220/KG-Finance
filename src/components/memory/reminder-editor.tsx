@@ -72,7 +72,7 @@ export function ReminderEditor({
   const canSave = text.trim().length > 0;
   const preview = { ...draft, id: initial?.id ?? "preview" } as Reminder;
 
-  const field = "mt-1 w-full glass rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#007aff]/40";
+  const field = "mt-1 w-full glass-field rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent/40";
   const label = "text-[11px] font-medium text-muted";
 
   return (
@@ -109,7 +109,7 @@ export function ReminderEditor({
                 onClick={() => setPerson(option.value)}
                 className={cn(
                   "rounded-lg px-2 py-2 text-[11px] font-semibold transition-colors",
-                  person === option.value ? "bg-[#af52de] text-white" : "glass text-muted hover:text-foreground"
+                  person === option.value ? "bg-feature text-white" : "glass text-muted hover:text-foreground"
                 )}
               >
                 {option.label}
@@ -129,7 +129,7 @@ export function ReminderEditor({
                 className={cn(
                   "rounded-lg px-2 py-2 text-[11px] font-semibold transition-colors",
                   repeat === option.value
-                    ? "bg-[#007aff] text-white"
+                    ? "glass-pill"
                     : "glass text-muted hover:text-foreground"
                 )}
               >
@@ -242,8 +242,8 @@ export function ReminderEditor({
         </div>
 
         {/* Say back exactly what was built, so nothing is a surprise later. */}
-        <div className="rounded-xl border border-[#007aff]/25 bg-[#007aff]/[0.07] px-3 py-2">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-[#007aff]">
+        <div className="rounded-xl border border-accent/25 bg-accent/[0.07] px-3 py-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-accent">
             {assistantName} will remember
           </p>
           <p className="mt-0.5 text-[12px]">

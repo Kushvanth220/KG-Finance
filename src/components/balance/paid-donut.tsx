@@ -8,7 +8,7 @@ import { formatCurrency } from "@/lib/formatters";
  * to sit in a header; the numbers beside it do the talking.
  */
 
-const TINT: Record<Person, string> = { kushvanth: "#007aff", g: "#af52de" };
+const TINT: Record<Person, string> = { kushvanth: "var(--accent)", g: "var(--feature)" };
 
 export function PaidDonut({ paid, size = 44 }: { paid: Record<Person, number>; size?: number }) {
   const total = paid.kushvanth + paid.g;

@@ -1,6 +1,6 @@
 import { MEMBERS_LABEL, SHOW_NAMES } from "@/lib/branding";
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Cinzel, Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -10,6 +10,12 @@ const geistSans = Geist({
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+// The wordmark's face. "KG Finance" is the only thing set in it.
+const cinzel = Cinzel({
+  variable: "--font-cinzel",
   subsets: ["latin"],
 });
 
@@ -28,7 +34,7 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f2f2f7" },
+    { media: "(prefers-color-scheme: light)", color: "#f4f8ff" },
     { media: "(prefers-color-scheme: dark)", color: "#000000" },
   ],
   width: "device-width",
@@ -44,7 +50,10 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${cinzel.variable} h-full antialiased`}
+      // Smooth scrolling is deliberate here (see SmoothScroll). Saying so
+      // stops Next from resetting it on every route change.
+      data-scroll-behavior="smooth"
       suppressHydrationWarning
     >
       {/* The app's chrome lives in the (app) group's layout; the intro page

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, ChevronDown, Cloud, CloudOff, Loader2, RefreshCw } from "lucide-react";
 import { SyncArt } from "@/components/art/page-art";
 import { Tilt3D } from "@/components/art/tilt-3d";
@@ -36,6 +36,8 @@ interface CloudCounts {
   accounts: number;
   bills: number;
   flexDeposits: number;
+  /** Absent from a server that predates money transfers. */
+  remittances?: number;
 }
 
 interface HealthPayload {
@@ -83,6 +85,7 @@ export default function SyncPage() {
   const accounts = useFinanceStore((state) => state.accounts);
   const monthlyExpenses = useFinanceStore((state) => state.monthlyExpenses);
   const flexDeposits = useFinanceStore((state) => state.flexDeposits);
+  const remittances = useFinanceStore((state) => state.remittances);
   const ruleEntries = useRulesStore((state) => state.entries);
 
   const [status, setStatus] = useState<SyncStatus>(getCurrentSyncStatus);
@@ -105,13 +108,29 @@ export default function SyncPage() {
   // Flex blocks travel on their own channel; keep it live while we look.
   useEffect(() => startRulesLiveSync(), []);
 
+  /** The stamp the Flex block count on screen was taken from. */
+  const countedRulesStamp = useRef<string | null>(null);
+
   const checkCloud = useCallback(async () => {
     setCloudChecking(true);
     try {
+      // Counting the cloud's Flex blocks used to download the whole rules
+      // document — 37 KB to learn one number, on open and after every sync.
+      // The stamp answers "has it moved?" in about fifty bytes; the document
+      // only travels when it has.
+      const known = countedRulesStamp.current;
       const [health, rules] = await Promise.all([
         fetch("/api/cloud-health", { cache: "no-store" }).then((res) => res.json() as Promise<HealthPayload>),
-        fetch("/api/rules", { cache: "no-store" })
-          .then((res) => res.json() as Promise<{ ok?: boolean; entries?: unknown[]; updated_at?: string | null }>)
+        fetch(known ? `/api/rules?stamp=${encodeURIComponent(known)}` : "/api/rules", { cache: "no-store" })
+          .then(
+            (res) =>
+              res.json() as Promise<{
+                ok?: boolean;
+                unchanged?: boolean;
+                entries?: unknown[];
+                updated_at?: string | null;
+              }>
+          )
           .catch(() => null),
       ]);
       if (health.ok && health.matched) {
@@ -125,7 +144,11 @@ export default function SyncPage() {
         setCloudError(health.error ?? "Could not read the cloud.");
       }
       setOtherRows((health.rows ?? []).filter((row) => row.workspace_id !== health.workspaceId));
-      if (rules?.ok) setCloudRules({ entries: rules.entries?.length ?? 0, updated_at: rules.updated_at ?? null });
+      // "unchanged" carries no document, so the count already on screen stands.
+      if (rules?.ok && !rules.unchanged) {
+        countedRulesStamp.current = rules.updated_at ?? null;
+        setCloudRules({ entries: rules.entries?.length ?? 0, updated_at: rules.updated_at ?? null });
+      }
     } catch {
       setCloud(null);
       setCloudError("Could not reach the cloud from this phone.");
@@ -184,22 +207,23 @@ export default function SyncPage() {
     { label: "Accounts", here: accounts.length, cloud: cloud?.accounts ?? null },
     { label: "Bills", here: monthlyExpenses.length, cloud: cloud?.bills ?? null },
     { label: "Flex deposits", here: flexDeposits?.length ?? 0, cloud: cloud?.flexDeposits ?? null },
+    { label: "Money transfers", here: remittances?.length ?? 0, cloud: cloud?.remittances ?? null },
     { label: "Flex blocks", here: ruleEntries.length, cloud: cloudRules?.entries ?? null },
   ];
   const allLevel = cloud !== null && rows.every((row) => row.cloud === null || row.cloud === row.here);
 
   const headline =
     configured === false
-      ? { tone: "#ff9500", text: "Not connected yet" }
+      ? { tone: "var(--warning)", text: "Not connected yet" }
       : status === "syncing" || busy
-        ? { tone: "#007aff", text: "Syncing…" }
+        ? { tone: "var(--accent)", text: "Syncing…" }
         : status === "error"
-          ? { tone: "#ff3b30", text: "Sync problem" }
+          ? { tone: "var(--danger)", text: "Sync problem" }
           : pending
-            ? { tone: "#ff9500", text: "Changes waiting to upload" }
+            ? { tone: "var(--warning)", text: "Changes waiting to upload" }
             : cloud && !allLevel
-              ? { tone: "#ff9500", text: "Cloud has something this phone hasn't" }
-              : { tone: "#34c759", text: "Up to date" };
+              ? { tone: "var(--warning)", text: "Cloud has something this phone hasn't" }
+              : { tone: "var(--success)", text: "Up to date" };
 
   const artStatus =
     configured === false
@@ -214,7 +238,7 @@ export default function SyncPage() {
     <div className="max-w-lg mx-auto space-y-4 pb-8">
       <div>
         <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-          <Cloud className="w-7 h-7 text-[#007aff]" />
+          <Cloud className="w-7 h-7 text-accent" />
           Cloud Sync
         </h1>
         <p className="text-muted mt-1 text-sm">
@@ -232,7 +256,7 @@ export default function SyncPage() {
 
       {configured === false ? (
         <GlassCard className="p-5 space-y-2">
-          <p className="flex items-center gap-2 font-medium text-[#ff9500]">
+          <p className="flex items-center gap-2 font-medium text-caution">
             <CloudOff className="h-4 w-4" /> Not connected yet
           </p>
           <p className="text-sm text-muted">
@@ -242,7 +266,7 @@ export default function SyncPage() {
         </GlassCard>
       ) : configured === null ? (
         <GlassCard className="p-5">
-          <Loader2 className="w-5 h-5 animate-spin text-[#007aff]" />
+          <Loader2 className="w-5 h-5 animate-spin text-accent" />
         </GlassCard>
       ) : (
         <GlassCard className="!p-4 space-y-3">
@@ -267,19 +291,19 @@ export default function SyncPage() {
               type="button"
               onClick={runSyncNow}
               disabled={busy}
-              className="hit inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-[#007aff] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+              className="hit inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-accent px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
             >
               <RefreshCw className={cn("h-3.5 w-3.5", busy && "animate-spin")} /> Sync now
             </button>
           </div>
 
           {error ? (
-            <div className="rounded-xl bg-[#ff3b30]/10 px-3 py-2 text-[12px]">
-              <p className="font-medium text-[#ff3b30]">{explain(error)}</p>
+            <div className="rounded-xl bg-negative/10 px-3 py-2 text-[12px]">
+              <p className="font-medium text-negative">{explain(error)}</p>
               {explain(error) !== error ? <p className="mt-0.5 text-[10px] text-muted">{error}</p> : null}
             </div>
           ) : cloudError ? (
-            <div className="rounded-xl bg-[#ff9500]/10 px-3 py-2 text-[12px] text-[#ff9500]">{cloudError}</div>
+            <div className="rounded-xl bg-caution/10 px-3 py-2 text-[12px] text-caution">{cloudError}</div>
           ) : null}
 
           {/* This phone against the cloud, one line per kind of record. */}
@@ -304,9 +328,9 @@ export default function SyncPage() {
                   </span>
                   <span className="flex justify-end">
                     {row.cloud === null ? null : level ? (
-                      <Check className="h-3.5 w-3.5 text-[#34c759]" aria-label="Level" />
+                      <Check className="h-3.5 w-3.5 text-positive" aria-label="Level" />
                     ) : (
-                      <span className="h-2 w-2 rounded-full bg-[#ff9500]" aria-label="Differs" />
+                      <span className="h-2 w-2 rounded-full bg-caution" aria-label="Differs" />
                     )}
                   </span>
                 </div>

@@ -3,6 +3,8 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Filter, RotateCcw, Trash2 } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { listRow, transition } from "@/lib/motion-presets";
 import { DeletedHistoryCard } from "@/components/history/deleted-history-card";
 import { ActiveTransactionDetails } from "@/components/history/active-transaction-details";
 import { CompactPageShell } from "@/components/ui/compact-page-shell";
@@ -20,7 +22,12 @@ import {
 import { useFinanceStore, getFinanceState } from "@/store/finance-store";
 import { getAvailableMonthKeys } from "@/lib/calculations";
 import { formatCurrency, formatDateTime, compareByDateTime, isWithinDateRange } from "@/lib/formatters";
-import { getTransactionDisplayMessage, getTransactionActor } from "@/lib/transaction-messages";
+import {
+  getTransactionDisplayMessage,
+  getTransactionActor,
+  isMoneyIn,
+  isRefund,
+} from "@/lib/transaction-messages";
 import { forcePushNow, getActiveWorkspaceId } from "@/lib/supabase/sync";
 import { PERSON_LABELS, type Person, type Transaction, type TransactionType } from "@/types";
 import { cn } from "@/lib/utils";
@@ -39,14 +46,14 @@ const typeLabels: Record<TransactionType, string> = {
 };
 
 const typeColors: Record<TransactionType, string> = {
-  income: "text-[#34c759]",
-  expense: "text-[#ff3b30]",
-  transfer: "text-[#5856d6]",
-  cash_withdrawal: "text-[#ff9500]",
-  cash_deposit: "text-[#34c759]",
-  debt_payment: "text-[#007aff]",
-  credit_payment: "text-[#007aff]",
-  settlement: "text-[#af52de]",
+  income: "text-positive",
+  expense: "text-negative",
+  transfer: "text-indigo",
+  cash_withdrawal: "text-caution",
+  cash_deposit: "text-positive",
+  debt_payment: "text-accent",
+  credit_payment: "text-accent",
+  settlement: "text-feature",
   balance_adjustment: "text-muted",
 };
 
@@ -125,6 +132,7 @@ function HistoryPageContent({
   const [isDeleting, setIsDeleting] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const still = useReducedMotion();
   const [deletedByChoice, setDeletedByChoice] = useState<Person>("kushvanth");
 
   const bounds = getMonthRangeBounds(dateRange);
@@ -265,7 +273,7 @@ function HistoryPageContent({
           onClick={() => setView("active")}
           className={cn(
             "flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors",
-            view === "active" ? "bg-[#007aff] text-white" : "text-muted"
+            view === "active" ? "glass-pill" : "text-muted"
           )}
         >
           Active
@@ -276,7 +284,7 @@ function HistoryPageContent({
           className={cn(
             "flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors",
             view === "deleted"
-              ? "bg-[#ff3b30] text-white"
+              ? "bg-negative text-white"
               : "text-muted"
           )}
         >
@@ -337,11 +345,11 @@ function HistoryPageContent({
       ) : null}
 
       {linkedHighlightId ? (
-        <p className="text-[10px] text-[#007aff] px-1">Linked from the shared balance</p>
+        <p className="text-[10px] text-accent px-1">Linked from the shared balance</p>
       ) : null}
 
       {deleteError ? (
-        <p className="text-xs text-[#ff3b30] bg-[#ff3b30]/10 rounded-2xl px-4 py-3">
+        <p className="text-xs text-negative bg-negative/10 rounded-2xl px-4 py-3">
           {deleteError}
         </p>
       ) : null}
@@ -367,33 +375,38 @@ function HistoryPageContent({
         ) : filtered.length === 0 ? (
           <p className="text-xs text-muted p-4 text-center">No transactions</p>
         ) : (
-          filtered.map((transaction) => {
-            const refund =
-              transaction.type === "expense" && (transaction.refund === true || transaction.amount < 0);
-            const isPositive =
-              transaction.type === "income" || transaction.type === "cash_deposit" || refund;
+          <AnimatePresence initial={false}>
+          {filtered.map((transaction) => {
+            const refund = isRefund(transaction);
+            const isPositive = isMoneyIn(transaction);
             const message = getTransactionDisplayMessage(transaction);
             const actor = getTransactionActor(transaction);
 
             return (
-              <div
+              <motion.div
                 key={transaction.id}
                 id={`history-txn-${transaction.id}`}
+                layout={still ? false : "position"}
+                variants={still ? undefined : listRow}
+                initial={still ? false : "hidden"}
+                animate={still ? undefined : "shown"}
+                exit={still ? undefined : "gone"}
+                transition={transition}
                 className={cn(
-                  "flex items-start justify-between px-3 py-2.5 gap-2 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]",
+                  "flex items-start justify-between overflow-hidden px-3 py-2.5 gap-2 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]",
                   linkedHighlightId === transaction.id &&
-                    "bg-[#007aff]/10 ring-2 ring-inset ring-[#007aff]/40"
+                    "bg-accent/10 ring-2 ring-inset ring-accent/40"
                 )}
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-[#007aff]/15 text-[#007aff]">
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-accent/15 text-accent">
                       {PERSON_LABELS[actor]}
                     </span>
                     <span
                       className={cn(
                         "text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-black/5 dark:bg-white/5",
-                        refund ? "text-[#34c759]" : typeColors[transaction.type]
+                        refund ? "text-positive" : typeColors[transaction.type]
                       )}
                     >
                       {refund ? "Refund" : typeLabels[transaction.type]}
@@ -409,7 +422,7 @@ function HistoryPageContent({
                   <span
                     className={cn(
                       "text-xs font-semibold tabular-nums whitespace-nowrap",
-                      isPositive ? "text-[#34c759]" : "text-foreground"
+                      isPositive ? "text-positive" : "text-foreground"
                     )}
                   >
                     {isPositive ? "+" : "-"}
@@ -421,15 +434,16 @@ function HistoryPageContent({
                       event.stopPropagation();
                       openDeleteConfirm(transaction);
                     }}
-                    className="text-muted hover:text-[#ff3b30] p-1.5 rounded-lg hover:bg-[#ff3b30]/10"
+                    className="text-muted hover:text-negative p-1.5 rounded-lg hover:bg-negative/10"
                     aria-label="Delete transaction"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
-              </div>
+              </motion.div>
             );
-          })
+          })}
+          </AnimatePresence>
         )}
       </GlassCard>
 
@@ -454,7 +468,7 @@ function HistoryPageContent({
                 onClick={() => setDeletedByChoice(p)}
                 className={cn(
                   "flex-1 py-2 rounded-lg text-xs font-medium",
-                  deletedByChoice === p ? "bg-[#007aff] text-white" : "text-muted"
+                  deletedByChoice === p ? "glass-pill" : "text-muted"
                 )}
               >
                 {PERSON_LABELS[p]}

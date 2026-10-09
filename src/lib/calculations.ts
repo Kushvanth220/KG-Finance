@@ -189,6 +189,27 @@ export function getPersonExpensesForPeriod(
   });
 }
 
+/**
+ * What one person spent in a period.
+ *
+ * A shared $12 lunch is $6 of Kushvanth's spending, not $12 — so this sums
+ * each row's SHARE, never its face value. Summing `amount` instead counts the
+ * other person's half as well, which is how the dashboard dial and its own
+ * spending panel came to disagree by exactly the shared half of six rows.
+ * Everything that reports a person's spending goes through here.
+ */
+export function sumPersonExpenses(
+  transactions: Transaction[],
+  person: Person,
+  start: Date,
+  end: Date
+): number {
+  return getPersonExpensesForPeriod(transactions, person, start, end).reduce(
+    (sum, tx) => sum + getTransactionExpenseShare(tx, person),
+    0
+  );
+}
+
 export function getWeeklyExpenseTotal(
   transactions: Transaction[],
   person: Person,

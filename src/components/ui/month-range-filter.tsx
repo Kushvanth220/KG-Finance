@@ -106,7 +106,7 @@ export function MonthRangeFilter({ value, onChange, monthOptions }: MonthRangeFi
             className={cn(
               "px-2 py-1 rounded-lg text-[10px] font-medium transition-colors",
               value.mode === id
-                ? "bg-[#007aff] text-white"
+                ? "glass-pill"
                 : "bg-black/5 dark:bg-white/5 text-muted hover:text-foreground"
             )}
           >

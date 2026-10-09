@@ -9,42 +9,42 @@ import type { SpendCategory } from "@/types";
 
 /** The palette offered in Manage categories — the app's own accent set. */
 export const CATEGORY_COLORS = [
-  "#ff3b30",
-  "#ff9500",
-  "#ffcc00",
-  "#34c759",
-  "#00c7be",
-  "#007aff",
-  "#5856d6",
-  "#af52de",
-  "#ff2d55",
-  "#a2845e",
-  "#8e8e93",
+  "var(--danger)",
+  "var(--warning)",
+  "var(--chart-gold)",
+  "var(--success)",
+  "#2bb5c4",
+  "var(--accent)",
+  "var(--accent-secondary)",
+  "var(--feature)",
+  "var(--pink)",
+  "#6f7fa8",
+  "var(--neutral)",
 ] as const;
 
 const GUESSES: ReadonlyArray<readonly [RegExp, string, string]> = [
-  [/grocer|costco|walmart|aldi|kroger|heb|trader|market|produce/i, "🛒", "#34c759"],
-  [/coffee|cafe|starbucks|\btea\b|boba/i, "☕", "#a2845e"],
-  [/food|restaurant|dining|lunch|dinner|breakfast|takeout|doordash|eats|pizza|burger|snack/i, "🍔", "#ff9500"],
-  [/\bgas\b|fuel|petrol/i, "⛽", "#ff3b30"],
-  [/\bcar\b|auto|uber|lyft|transit|\bbus\b|train|parking|toll|vehicle/i, "🚗", "#5856d6"],
-  [/rent|mortgage|\bhome\b|house|apartment/i, "🏠", "#007aff"],
-  [/subscri|netflix|spotify|prime|youtube|stream|icloud/i, "📺", "#af52de"],
-  [/phone|mobile|verizon|at&t|internet|wifi|data/i, "📱", "#00c7be"],
-  [/electric|power|water|utilit|\bbill/i, "💡", "#ffcc00"],
-  [/loan|education|tuition|school|college|student|course/i, "🎓", "#007aff"],
-  [/cash|atm|withdraw/i, "💵", "#34c759"],
-  [/shop|amazon|cloth|target|mall|order/i, "🛍️", "#ff2d55"],
-  [/health|doctor|pharma|medic|dentist|gym|fitness|clinic/i, "💊", "#ff3b30"],
-  [/travel|flight|hotel|trip|vacation|airbnb/i, "✈️", "#00c7be"],
-  [/gift|birthday|present|wedding/i, "🎁", "#ff2d55"],
-  [/fun|movie|game|entertain|concert|party/i, "🎬", "#af52de"],
-  [/insur/i, "🛡️", "#5856d6"],
-  [/\bpet|\bdog|\bcat\b/i, "🐾", "#a2845e"],
-  [/beauty|salon|hair|nail|spa/i, "💅", "#ff2d55"],
-  [/kid|baby|child|toy/i, "🧸", "#ffcc00"],
-  [/family|parent|mom|dad|india|send/i, "🏡", "#ff9500"],
-  [/laundry|clean|supply|supplies/i, "🧺", "#00c7be"],
+  [/grocer|costco|walmart|aldi|kroger|heb|trader|market|produce/i, "🛒", "var(--success)"],
+  [/coffee|cafe|starbucks|\btea\b|boba/i, "☕", "#6f7fa8"],
+  [/food|restaurant|dining|lunch|dinner|breakfast|takeout|doordash|eats|pizza|burger|snack/i, "🍔", "var(--warning)"],
+  [/\bgas\b|fuel|petrol/i, "⛽", "var(--danger)"],
+  [/\bcar\b|auto|uber|lyft|transit|\bbus\b|train|parking|toll|vehicle/i, "🚗", "var(--accent-secondary)"],
+  [/rent|mortgage|\bhome\b|house|apartment/i, "🏠", "var(--accent)"],
+  [/subscri|netflix|spotify|prime|youtube|stream|icloud/i, "📺", "var(--feature)"],
+  [/phone|mobile|verizon|at&t|internet|wifi|data/i, "📱", "#2bb5c4"],
+  [/electric|power|water|utilit|\bbill/i, "💡", "var(--chart-gold)"],
+  [/loan|education|tuition|school|college|student|course/i, "🎓", "var(--accent)"],
+  [/cash|atm|withdraw/i, "💵", "var(--success)"],
+  [/shop|amazon|cloth|target|mall|order/i, "🛍️", "var(--pink)"],
+  [/health|doctor|pharma|medic|dentist|gym|fitness|clinic/i, "💊", "var(--danger)"],
+  [/travel|flight|hotel|trip|vacation|airbnb/i, "✈️", "#2bb5c4"],
+  [/gift|birthday|present|wedding/i, "🎁", "var(--pink)"],
+  [/fun|movie|game|entertain|concert|party/i, "🎬", "var(--feature)"],
+  [/insur/i, "🛡️", "var(--accent-secondary)"],
+  [/\bpet|\bdog|\bcat\b/i, "🐾", "#6f7fa8"],
+  [/beauty|salon|hair|nail|spa/i, "💅", "var(--pink)"],
+  [/kid|baby|child|toy/i, "🧸", "var(--chart-gold)"],
+  [/family|parent|mom|dad|india|send/i, "🏡", "var(--warning)"],
+  [/laundry|clean|supply|supplies/i, "🧺", "#2bb5c4"],
 ];
 
 /** A reasonable emoji and colour for a category by its name alone. */
@@ -52,7 +52,7 @@ export function suggestCategoryLook(name: string): { emoji: string; color: strin
   for (const [pattern, emoji, color] of GUESSES) {
     if (pattern.test(name)) return { emoji, color };
   }
-  return { emoji: "🏷️", color: "#8e8e93" };
+  return { emoji: "🏷️", color: "var(--neutral)" };
 }
 
 /** What the category actually shows: its own look, falling back to the guess. */

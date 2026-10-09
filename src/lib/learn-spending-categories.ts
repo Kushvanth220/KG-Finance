@@ -31,8 +31,9 @@ function sumMappedSpending(
   transactions: Transaction[],
   person: Person,
   spendCategories: SpendCategory[]
-): Map<string, number> {
-  const spent = new Map<string, number>();
+): { byCategory: Map<string, number>; unmapped: number } {
+  const byCategory = new Map<string, number>();
+  let unmapped = 0;
 
   for (const tx of transactions) {
     if (tx.type !== "expense") continue;
@@ -40,12 +41,17 @@ function sumMappedSpending(
     if (share === 0) continue;
 
     const categoryName = resolveTransactionSpendCategory(tx, spendCategories);
-    if (!categoryName) continue;
+    // Money that matches no category is still money. Dropping it here is how
+    // the headline drifted away from the ledger.
+    if (!categoryName) {
+      unmapped += share;
+      continue;
+    }
 
-    spent.set(categoryName, (spent.get(categoryName) ?? 0) + share);
+    byCategory.set(categoryName, (byCategory.get(categoryName) ?? 0) + share);
   }
 
-  return spent;
+  return { byCategory, unmapped };
 }
 
 function hasMappedSpendingOutsidePeriod(
@@ -76,22 +82,38 @@ export function buildLearnedCategorySpending(
   periodStart: Date,
   periodEnd: Date
 ): {
+  /** Categories with money spent in them, largest first. What the chart draws. */
   spent: CategorySpendRow[];
+  /** Categories used in other periods but not this one. */
   skipped: string[];
+  /**
+   * Categories that came out NEGATIVE — a refund or settlement bigger than
+   * anything spent against them.
+   *
+   * A chart cannot draw a negative slice, so these stay out of `spent`. They
+   * must still reach the total: leaving a $115 refund out made the dashboard
+   * claim $115 more spending than the ledger held.
+   */
+  offsets: CategorySpendRow[];
+  /** Shares on rows matching no category at all. Rare, and equally real. */
+  unmapped: number;
 } {
-  const spentByName = sumMappedSpending(periodTransactions, person, spendCategories);
+  const { byCategory, unmapped } = sumMappedSpending(periodTransactions, person, spendCategories);
 
   const spent: CategorySpendRow[] = [];
+  const offsets: CategorySpendRow[] = [];
   const skipped: string[] = [];
 
   spendCategories.forEach((category, index) => {
-    const amount = spentByName.get(category.name) ?? 0;
+    const amount = byCategory.get(category.name) ?? 0;
+
     if (amount > 0) {
-      spent.push({
-        name: category.name,
-        amount,
-        color: getExpenseCategoryColor(index),
-      });
+      spent.push({ name: category.name, amount, color: getExpenseCategoryColor(index) });
+      return;
+    }
+
+    if (amount < 0) {
+      offsets.push({ name: category.name, amount, color: getExpenseCategoryColor(index) });
       return;
     }
 
@@ -110,7 +132,8 @@ export function buildLearnedCategorySpending(
   });
 
   spent.sort((a, b) => b.amount - a.amount);
+  offsets.sort((a, b) => a.amount - b.amount);
   skipped.sort((a, b) => a.localeCompare(b));
 
-  return { spent, skipped };
+  return { spent, skipped, offsets, unmapped };
 }

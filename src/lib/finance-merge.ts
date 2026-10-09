@@ -143,6 +143,7 @@ export function mergeFinanceStates(
     deletedHistory: mergeById(undefined, local.deletedHistory, remote.deletedHistory),
     greenDotTrackingStartDate: scalar(b?.greenDotTrackingStartDate, local.greenDotTrackingStartDate, remote.greenDotTrackingStartDate),
     flexDeposits: mergeById(b?.flexDeposits, local.flexDeposits, remote.flexDeposits),
+    remittances: mergeById(b?.remittances, local.remittances, remote.remittances, { newestFirst: true }),
   };
 }
 

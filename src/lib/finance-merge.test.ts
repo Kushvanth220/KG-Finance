@@ -110,3 +110,39 @@ describe("mergeFinanceStates", () => {
     expect(merged.accounts[0]?.balance).toBe(475);
   });
 });
+
+describe("mergeFinanceStates — money transfers", () => {
+  const sent = (id: string, usdAmount = 500) => ({
+    id,
+    person: "kushvanth" as const,
+    date: "2026-10-08",
+    country: "IN" as const,
+    usdAmount,
+    receivedAmount: usdAmount * 84,
+    rate: 84,
+    method: "remitly" as const,
+    reason: "family" as const,
+    createdAt: "2026-10-08T12:00:00.000Z",
+  });
+
+  it("keeps a transfer added on either phone and drops one deleted on the other", () => {
+    const base = state({ remittances: [sent("old")] });
+    const local = state({ remittances: [sent("old"), sent("mine")] });
+    const remote = state({ remittances: [sent("theirs")] }); // deleted "old"
+    const merged = mergeFinanceStates(base, local, remote);
+    expect(merged.remittances?.map((r) => r.id).sort()).toEqual(["mine", "theirs"]);
+  });
+
+  it("takes an edit from whichever side made it", () => {
+    const base = state({ remittances: [sent("a", 500)] });
+    const local = state({ remittances: [sent("a", 500)] });
+    const remote = state({ remittances: [sent("a", 450)] });
+    expect(mergeFinanceStates(base, local, remote).remittances?.[0]?.usdAmount).toBe(450);
+  });
+
+  it("reads a cloud record from before transfers existed as none, not as a wipe", () => {
+    const local = state({ remittances: [sent("mine")] });
+    const remote = state();
+    expect(mergeFinanceStates(null, local, remote).remittances?.map((r) => r.id)).toEqual(["mine"]);
+  });
+});

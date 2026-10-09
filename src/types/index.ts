@@ -184,6 +184,60 @@ export interface FlexDeposit {
   auto?: boolean;
 }
 
+/** Where money sent abroad lands. The currency follows from it (lib/remittances). */
+export type RemittanceCountry = "IN" | "PH";
+
+export type RemittanceCurrency = "INR" | "PHP";
+
+export type RemittanceMethod = "remitly" | "wise" | "western_union" | "bank_transfer" | "other";
+
+export type RemittanceReason =
+  | "family"
+  | "household"
+  | "medical"
+  | "education"
+  | "savings"
+  | "gift"
+  | "other";
+
+/**
+ * Money sent from the US to India or the Philippines, as it actually happened.
+ *
+ * Both sides are stored as recorded — the dollars that left and the rupees or
+ * pesos that arrived — and so is the rate between them. A live rate is never
+ * written back into a past transfer; `marketRate` is kept only to compare.
+ *
+ * A standalone record: it does not move an account balance or write a History
+ * row, so a transfer already logged as a spend is not counted twice.
+ */
+export interface Remittance {
+  id: string;
+  /** Who sent it. */
+  person: Person;
+  /** yyyy-MM-dd, in the app's time zone. */
+  date: string;
+  country: RemittanceCountry;
+  /** What was converted, in US dollars — before any fee. */
+  usdAmount: number;
+  /** What arrived, in the destination currency (INR for India, PHP for the Philippines). */
+  receivedAmount: number;
+  /** Destination currency per 1 USD for this transfer, as recorded. */
+  rate: number;
+  /** The market rate shown when this was recorded, for comparison only. */
+  marketRate?: number;
+  /** Charged on top of `usdAmount`, in US dollars. Never part of the amount sent. */
+  feeUsd?: number;
+  method: RemittanceMethod;
+  /** The service's name, when `method` is "other". */
+  methodName?: string;
+  reason: RemittanceReason;
+  /** The sender's own words. */
+  note?: string;
+  /** ISO time it was recorded. */
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export interface FinanceState {
   incomeSources: IncomeSource[];
   incomeEntries: IncomeEntry[];
@@ -201,6 +255,8 @@ export interface FinanceState {
   greenDotTrackingStartDate?: string;
   /** Flex payouts confirmed as landed; absent on records from before this existed. */
   flexDeposits?: FlexDeposit[];
+  /** Money sent abroad; absent on records from before this existed. */
+  remittances?: Remittance[];
 }
 
 export const PERSON_LABELS: Record<Person, string> = {

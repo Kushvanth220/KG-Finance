@@ -69,11 +69,11 @@ export function NotificationCard() {
     <div className="glass rounded-xl p-3">
       <div className="flex items-center justify-between gap-2">
         <p className="flex items-center gap-1.5 text-xs font-semibold">
-          <BellRing className={cn("h-3.5 w-3.5", status === "subscribed" ? "text-[#34c759]" : "text-[#ff9500]")} />
+          <BellRing className={cn("h-3.5 w-3.5", status === "subscribed" ? "text-positive" : "text-caution")} />
           Notifications
         </p>
         {status === "subscribed" ? (
-          <button type="button" onClick={turnOff} disabled={busy} className="text-[11px] font-semibold text-[#ff3b30] disabled:opacity-40">
+          <button type="button" onClick={turnOff} disabled={busy} className="text-[11px] font-semibold text-negative disabled:opacity-40">
             Turn off
           </button>
         ) : status === "prompt" ? (
@@ -91,7 +91,7 @@ export function NotificationCard() {
               type="button"
               onClick={turnOn}
               disabled={busy}
-              className="rounded-lg bg-[#007aff] px-2.5 py-1 text-[11px] font-semibold text-white disabled:opacity-40"
+              className="rounded-lg bg-accent px-2.5 py-1 text-[11px] font-semibold text-white disabled:opacity-40"
             >
               Turn on
             </button>
@@ -99,7 +99,7 @@ export function NotificationCard() {
         ) : null}
       </div>
       <p className="mt-1 text-[11px] text-muted">{line}</p>
-      {error ? <p className="mt-1 text-[11px] text-[#ff3b30]">{error}</p> : null}
+      {error ? <p className="mt-1 text-[11px] text-negative">{error}</p> : null}
     </div>
   );
 }

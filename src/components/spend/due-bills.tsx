@@ -62,7 +62,7 @@ export function DueBills({ person, className }: { person: Person; className?: st
 
   return (
     <div className={cn("glass rounded-xl px-3 py-2.5", className)}>
-      <p className="mb-1.5 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-[#ff9500]">
+      <p className="mb-1.5 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-caution">
         <ReceiptText className="h-3 w-3" /> Due now
       </p>
       <div className="space-y-1.5">
@@ -78,7 +78,7 @@ export function DueBills({ person, className }: { person: Person; className?: st
                 </p>
               </div>
               {paid ? (
-                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#34c759]">
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-positive">
                   <Check className="h-3.5 w-3.5" /> Paid
                 </span>
               ) : (
@@ -110,7 +110,7 @@ export function DueBills({ person, className }: { person: Person; className?: st
                       });
                       setJustPaid((current) => ({ ...current, [bill.id]: true }));
                     }}
-                    className="rounded-lg bg-[#34c759] px-2.5 py-1 text-[11px] font-semibold text-white disabled:opacity-40"
+                    className="rounded-lg bg-positive px-2.5 py-1 text-[11px] font-semibold text-white disabled:opacity-40"
                   >
                     Paid
                   </button>
