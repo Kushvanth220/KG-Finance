@@ -6,11 +6,13 @@ import { useAssistant } from "@/components/assistant/assistant-context";
 import { AssistantNameSetup } from "@/components/assistant/assistant-name-setup";
 import { useAssistantChat } from "@/components/assistant/use-assistant-chat";
 import { KgMark } from "@/components/layout/kg-mark";
+import { AnswerTourCard } from "@/components/assistant/workspace/answer-tour-card";
 import { DetailPanel } from "@/components/assistant/workspace/detail-panel";
 import { FocusFan } from "@/components/assistant/workspace/focus-fan";
 import { MoneyUniverse } from "@/components/assistant/workspace/money-universe";
-import { HUB_ICON, useWorkspaceActivity } from "@/components/assistant/workspace/workspace-state";
+import { HUB_ICON, STAGE_TEXT, useWorkspaceActivity } from "@/components/assistant/workspace/workspace-state";
 import { WorkspaceConversation, type ConversationMode } from "@/components/assistant/workspace/workspace-conversation";
+import { buildAnswerTour, litSoFar, type TourStop } from "@/lib/answer-tour";
 import { buildFinanceGraph, type HubKey } from "@/lib/assistant-graph";
 import { zonedToday } from "@/lib/zoned-date";
 import { DEFAULT_ASSISTANT_NAME, useAssistantPreferencesStore } from "@/store/assistant-preferences-store";
@@ -55,6 +57,21 @@ function useWide(): boolean {
 const BRIEFING =
   "Give me a short briefing on my money right now: what needs attention today, what is coming this week, and how this month is going.";
 
+/** An answer being played on the map: which stop, and whether it is moving on by itself. */
+interface Tour {
+  reply: string;
+  stops: TourStop[];
+  /** The stop on screen; stops.length once it has finished. */
+  index: number;
+  playing: boolean;
+  /** Bumps whenever a stop starts over, so its timer and bar restart. */
+  run: number;
+}
+
+// Room the story card takes over the map, so the camera frames things clear of it.
+const CARD_INSET_PHONE = 150;
+const CARD_INSET_WIDE = 392;
+
 export function AssistantWorkspace({
   open,
   onVoiceLiveChange,
@@ -96,6 +113,46 @@ function Workspace({ onVoiceLiveChange }: { onVoiceLiveChange?: (live: boolean) 
   const { activity, onActivity, clear } = useWorkspaceActivity(graph);
   const chat = useAssistantChat({ assistantName: displayName, onActivity });
 
+  // Every new answer plays as a tour of the map: the camera flies to what
+  // each sentence names, lighting it, then pulls back to show it all.
+  const [tour, setTour] = useState<Tour | null>(null);
+  const [touredReply, setTouredReply] = useState<string | null>(null);
+  if (activity.lastReply && activity.lastReply !== touredReply && activity.phase !== "thinking") {
+    setTouredReply(activity.lastReply);
+    const stops = buildAnswerTour(graph, activity.lastReply);
+    setTour(stops.length ? { reply: activity.lastReply, stops, index: 0, playing: true, run: 0 } : null);
+    if (stops.length) setView("universe");
+  }
+
+  useEffect(() => {
+    if (!tour || !tour.playing || tour.index >= tour.stops.length) return;
+    const id = window.setTimeout(() => {
+      setTour((current) =>
+        current && { ...current, index: current.index + 1, run: current.run + 1, playing: current.index + 1 < current.stops.length }
+      );
+    }, tour.stops[tour.index]!.ms);
+    return () => window.clearTimeout(id);
+  }, [tour]);
+
+  const step = (by: number) =>
+    setTour((current) => current && { ...current, index: Math.max(0, Math.min(current.stops.length, current.index + by)), run: current.run + 1 });
+  const thinkingText = activity.phase === "thinking" ? (activity.stage ? STAGE_TEXT[activity.stage] : "Thinking") : null;
+  const touring = !!tour && !thinkingText && tour.index < tour.stops.length;
+  const tourStop = touring ? tour.stops[tour.index]! : null;
+  // While it plays, the map lights only what the tour has reached so far.
+  const mapActivity = useMemo(() => {
+    if (!touring || !tour) return activity;
+    const lit = litSoFar(tour.stops, tour.index + 1);
+    return { ...activity, activeHubs: lit.hubs, litLeaves: lit.leaves };
+  }, [activity, touring, tour]);
+  const tourFocus = tourStop && tourStop.hubs.length + tourStop.leaves.length > 0 ? [...tourStop.hubs, ...tourStop.leaves] : null;
+  const cardShown = !!thinkingText || !!tour;
+  const hasTour = !!tour;
+  const mapLabels = useMemo(
+    () => graph.hubs.flatMap((hub) => [hub.label, ...hub.leaves.map((item) => item.label)]),
+    [graph]
+  );
+
   const leaf = useMemo(
     () => (selectedLeaf ? graph.hubs.flatMap((hub) => hub.leaves).find((item) => item.id === selectedLeaf) ?? null : null),
     [graph, selectedLeaf]
@@ -123,19 +180,24 @@ function Workspace({ onVoiceLiveChange }: { onVoiceLiveChange?: (live: boolean) 
       // The confirm card takes Escape first, to dismiss itself.
       if (event.key !== "Escape" || event.defaultPrevented) return;
       event.preventDefault();
+      // Escape closes the nearest thing first: the search, the answer, then the assistant.
       if (searchOpen) setSearchOpen(false);
+      else if (hasTour) setTour(null);
       else closeAssistant();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [closeAssistant, searchOpen]);
+  }, [closeAssistant, searchOpen, hasTour]);
 
+  // Choosing something on the map ends the tour: you have taken over the camera.
   const selectHub = (key: HubKey) => {
+    setTour(null);
     setSelectedHub(key);
     setSelectedLeaf(null);
     setView("focus");
   };
   const selectLeaf = (id: string) => {
+    setTour(null);
     setSelectedLeaf(id);
     setSelectedHub(id.split(":")[0] as HubKey);
   };
@@ -282,7 +344,9 @@ function Workspace({ onVoiceLiveChange }: { onVoiceLiveChange?: (live: boolean) 
 
       <div className={docked ? "contents" : "relative flex min-h-0 flex-1 flex-col lg:flex-row"}>
         {!docked ? (
-          <section className="relative h-[44dvh] shrink-0 overflow-hidden sm:h-[48dvh] lg:h-auto lg:min-w-0 lg:flex-1" aria-label="Money map">
+          // The map is the stage: all of the screen above the question box on a
+          // phone, everything left of the panel on a computer.
+          <section className="relative min-h-0 flex-1 overflow-hidden lg:min-w-0" aria-label="Money map">
             {focusHub ? (
               <FocusFan
                 key={focusHub.key}
@@ -297,15 +361,57 @@ function Workspace({ onVoiceLiveChange }: { onVoiceLiveChange?: (live: boolean) 
             ) : (
               <MoneyUniverse
                 graph={graph}
-                activity={activity}
+                activity={mapActivity}
                 selectedHub={selectedHub}
                 selectedLeaf={selectedLeaf}
                 zoom={zoom}
                 compact={!wide}
+                focus={tourFocus}
+                insetLeft={cardShown && wide ? CARD_INSET_WIDE : 0}
+                insetBottom={cardShown && !wide ? CARD_INSET_PHONE : 0}
                 onSelectHub={selectHub}
                 onSelectLeaf={selectLeaf}
               />
             )}
+
+            {cardShown ? (
+              <AnswerTourCard
+                stops={tour?.stops ?? []}
+                index={tour?.index ?? 0}
+                playing={tour?.playing ?? false}
+                run={tour?.run ?? 0}
+                reply={tour?.reply ?? ""}
+                labels={mapLabels}
+                thinking={thinkingText}
+                className={wide ? "absolute left-4 top-1/2 z-10 w-[360px] -translate-y-1/2" : "absolute inset-x-2 bottom-2 z-10"}
+                onPrev={() => step(-1)}
+                onNext={() => step(1)}
+                onTogglePlay={() => setTour((current) => current && { ...current, playing: !current.playing, run: current.run + 1 })}
+                onReplay={() => setTour((current) => current && { ...current, index: 0, playing: true, run: current.run + 1 })}
+                onClose={() => setTour(null)}
+              />
+            ) : null}
+
+            {/* On a phone the details are a sheet over the map, opened by choosing something on it. */}
+            {!wide && (selectedHub || leaf) && !cardShown ? (
+              <div className="ws-panel absolute inset-x-0 bottom-0 z-10 flex max-h-[52%] flex-col rounded-t-3xl" role="region" aria-label={`${detailHub.label} details`}>
+                <div className="flex shrink-0 items-center justify-between gap-2 px-4 pb-1 pt-2.5">
+                  <span className="mx-auto h-1 w-9 rounded-full bg-[#e3e8eb]/20" aria-hidden />
+                </div>
+                <div className="flex shrink-0 items-center justify-between gap-2 px-4">
+                  <p className="min-w-0 truncate text-[12px] text-[#e3e8eb]/70">
+                    {graph.core.label} · {detailHub.label}
+                    {leaf ? ` · ${leaf.label}` : ""}
+                  </p>
+                  <button type="button" onClick={backToUniverse} className={toolButton} aria-label="Close the details">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-1" data-lenis-prevent>
+                  <DetailPanel hub={detailHub} leaf={leaf} activity={activity} assistantName={displayName} onAsk={ask} onLeave={closeAssistant} />
+                </div>
+              </div>
+            ) : null}
 
             {searchOpen ? (
               <div className="ws-panel absolute left-1/2 top-2 z-20 w-[min(92%,22rem)] -translate-x-1/2 rounded-xl p-2">
@@ -351,7 +457,7 @@ function Workspace({ onVoiceLiveChange }: { onVoiceLiveChange?: (live: boolean) 
             ) : null}
 
             {!wide && !focusHub ? (
-              <div className="absolute bottom-2 left-2 flex rounded-lg border border-[var(--ws-edge)] bg-[#020404]/70 p-0.5" role="group" aria-label="Whose money">
+              <div className="absolute left-2 top-2 flex rounded-lg border border-[var(--ws-edge)] bg-[#020404]/70 p-0.5" role="group" aria-label="Whose money">
                 {(["kushvanth", "g"] as const).map((who) => (
                   <button
                     key={who}
@@ -378,10 +484,12 @@ function Workspace({ onVoiceLiveChange }: { onVoiceLiveChange?: (live: boolean) 
           className={
             docked
               ? "pointer-events-auto flex max-h-[min(70dvh,560px)] w-full max-w-md flex-col rounded-3xl ws-panel p-3 shadow-2xl sm:w-[24rem]"
-              : "relative flex min-h-0 flex-1 flex-col border-t border-[var(--ws-edge)] lg:w-[420px] lg:flex-none lg:border-l lg:border-t-0 xl:w-[460px]"
+              : wide
+                ? "relative flex min-h-0 flex-col border-l border-[var(--ws-edge)] lg:w-[420px] lg:flex-none xl:w-[460px]"
+                : "relative flex shrink-0 flex-col border-t border-[var(--ws-edge)]"
           }
         >
-          {!docked ? (
+          {!docked && wide ? (
             <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-3 pt-3 sm:px-5" data-lenis-prevent>
               <p className="mb-3 inline-flex max-w-full items-center gap-1.5 truncate rounded-xl border border-[var(--ws-edge)] px-3 py-1.5 text-[12px] text-[#e3e8eb]/75">
                 {graph.core.label} · {detailHub.label}
@@ -439,6 +547,7 @@ function Workspace({ onVoiceLiveChange }: { onVoiceLiveChange?: (live: boolean) 
                 onAnalyse={analyse}
                 expanded={expanded}
                 onExpandedChange={setExpanded}
+                hideFolded={cardShown}
               />
             )}
           </div>

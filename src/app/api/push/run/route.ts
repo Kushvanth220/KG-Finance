@@ -86,11 +86,13 @@ function flexNudges(
 
   const waiting = blocksAwaitingTips(rule, entries, TIP_CHASE_HOURS, now);
   if (waiting.length > 0) {
-    const days = waiting
+    // Several blocks often share a day; name each day once ("Mon 10/5", not three times).
+    const dates = [...new Set(waiting.map((entry) => entry.date))].sort();
+    const days = dates
       .slice(0, 3)
-      .map((entry) => new Date(`${entry.date}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "numeric", day: "numeric" }));
+      .map((date) => new Date(`${date}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "numeric", day: "numeric" }).replace(",", ""));
     out.push({
-      text: `Tips still blank on ${waiting.length} Flex ${waiting.length === 1 ? "block" : "blocks"} (${days.join(", ")}${waiting.length > 3 ? ", …" : ""})`,
+      text: `Tips still blank on ${waiting.length} Flex ${waiting.length === 1 ? "block" : "blocks"} (${days.join(", ")}${dates.length > 3 ? ", …" : ""})`,
       person: "kushvanth",
     });
   }
@@ -120,18 +122,40 @@ function authorised(request: Request): boolean {
   return request.headers.get("authorization") === `Bearer ${secret}`;
 }
 
+/** What one device would be sent: its title, its lines, where a tap goes. */
+function payloadFor(mine: Due[], iso: string) {
+  const lines = mine.slice(0, 3).map((item) => item.text);
+  if (mine.length > 3) lines.push(`and ${mine.length - 3} more`);
+  // A push that is only about Flex opens the Flex page.
+  const allFlex = mine.every((item) => /flex/i.test(item.text));
+  return {
+    title: mine.length === 1 ? (allFlex ? "Amazon Flex" : "Due soon") : `${mine.length} things to look at`,
+    body: lines.join("\n"),
+    url: allFlex ? "/flex" : "/memory",
+    tag: `kg-due-${iso}`,
+  };
+}
+
+/** A device registered to one person hears about their bills, plus anything not assigned to either. */
+const forDevice = (due: Due[], person: string | null) =>
+  due.filter((item) => !person || !item.person || item.person === person);
+
 export async function GET(request: Request) {
   if (!authorised(request)) {
     return NextResponse.json({ ok: false, error: "Unauthorised." }, { status: 401 });
   }
 
+  // `?dry=1` works out exactly what today's push would say — per person, and
+  // which devices would get it — and sends nothing. No keys needed.
+  const dry = new URL(request.url).searchParams.has("dry");
   const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
   const privateKey = process.env.VAPID_PRIVATE_KEY;
   const subject = process.env.VAPID_SUBJECT ?? "mailto:hello@example.com";
-  if (!publicKey || !privateKey) {
+  const keysSet = Boolean(publicKey && privateKey);
+  if (!keysSet && !dry) {
     return NextResponse.json({ ok: false, error: "VAPID keys are not configured." }, { status: 503 });
   }
-  webpush.setVapidDetails(subject, publicKey, privateKey);
+  if (keysSet) webpush.setVapidDetails(subject, publicKey!, privateKey!);
 
   try {
     const { iso, date } = dueToday();
@@ -162,6 +186,22 @@ export async function GET(request: Request) {
         new Date()
       ),
     ];
+    if (dry) {
+      const preview = (person: string | null) => {
+        const mine = forDevice(due, person);
+        return mine.length ? payloadFor(mine, iso) : null;
+      };
+      return NextResponse.json({
+        ok: true,
+        dry: true,
+        date: iso,
+        keysSet,
+        devices: subscriptions.map((sub) => sub.person ?? "both"),
+        due,
+        wouldSend: { kushvanth: preview("kushvanth"), g: preview("g"), both: preview(null) },
+      });
+    }
+
     if (due.length === 0 || subscriptions.length === 0) {
       return NextResponse.json({ ok: true, date: iso, due: due.length, sent: 0 });
     }
@@ -169,20 +209,9 @@ export async function GET(request: Request) {
     let sent = 0;
     let pruned = 0;
     for (const sub of subscriptions) {
-      // A device registered to one person hears about their bills, plus
-      // anything not assigned to either.
-      const mine = due.filter((item) => !sub.person || !item.person || item.person === sub.person);
+      const mine = forDevice(due, sub.person);
       if (mine.length === 0) continue;
-      const lines = mine.slice(0, 3).map((item) => item.text);
-      if (mine.length > 3) lines.push(`and ${mine.length - 3} more`);
-      // A push that is only about Flex opens the Flex page.
-      const allFlex = mine.every((item) => /flex/i.test(item.text));
-      const payload = JSON.stringify({
-        title: mine.length === 1 ? (allFlex ? "Amazon Flex" : "Due soon") : `${mine.length} things to look at`,
-        body: lines.join("\n"),
-        url: allFlex ? "/flex" : "/memory",
-        tag: `kg-due-${iso}`,
-      });
+      const payload = JSON.stringify(payloadFor(mine, iso));
       try {
         await webpush.sendNotification(sub.subscription as unknown as webpush.PushSubscription, payload, {
           TTL: 12 * 3600,

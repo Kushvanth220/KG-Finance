@@ -116,6 +116,10 @@ export function reduceActivity(state: WorkspaceActivity, event: AssistantActivit
       const lit = leavesMentioned(graph, event.text);
       return {
         ...state,
+        // The answer is here: stop "thinking" now, not after the chat has
+        // reloaded its history — the answer tour starts on this.
+        phase: state.phase === "confirm" ? "confirm" : "idle",
+        stage: null,
         lastReply: event.text,
         activeHubs: union(state.activeHubs, union(hubsMentioned(event.text), lit.map(hubOfLeaf))),
         litLeaves: union(state.litLeaves, lit),

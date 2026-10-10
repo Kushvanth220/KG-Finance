@@ -27,7 +27,8 @@ self.addEventListener("push", (event) => {
     self.registration.showNotification(payload.title, {
       body: payload.body,
       icon: "/apple-icon.png",
-      badge: "/icon.svg",
+      // The small status-bar icon on Android: a white lion, drawn from its alpha.
+      badge: "/brand/badge.png",
       tag: payload.tag || "kg-due",
       renotify: false,
       data: { url: payload.url },

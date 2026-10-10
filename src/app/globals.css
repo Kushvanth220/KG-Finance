@@ -2264,7 +2264,22 @@ input[type="number"] {
   to { background-position: -200% 0; }
 }
 
+/* The answer tour: each sentence rises in; the current stop's bar fills over its reading time. */
+.ws-tour-line {
+  animation: ws-tour-rise 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.ws-tour-fill {
+  animation: ws-tour-fill linear both;
+}
+@keyframes ws-tour-rise {
+  from { opacity: 0; transform: translateY(6px); }
+}
+@keyframes ws-tour-fill {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   /* The map still says everything standing still; only the drift goes. */
-  .ws-spin, .ws-spin-reverse, .ws-breathe, .ws-twinkle, .ws-flow, .ws-ping, .ws-shimmer { animation: none; }
+  .ws-spin, .ws-spin-reverse, .ws-breathe, .ws-twinkle, .ws-flow, .ws-ping, .ws-shimmer, .ws-tour-line { animation: none; }
 }

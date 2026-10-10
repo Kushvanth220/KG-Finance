@@ -137,6 +137,9 @@ const CORONA = (() => {
 
 const trimLabel = (text: string, max: number) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
 
+/** How close the camera may come when framing what an answer names. */
+const MAX_FRAME_SCALE = { compact: 1.9, wide: 1.7 };
+
 export function MoneyUniverse({
   graph,
   activity,
@@ -144,6 +147,9 @@ export function MoneyUniverse({
   selectedLeaf,
   zoom,
   compact,
+  focus = null,
+  insetLeft = 0,
+  insetBottom = 0,
   onSelectHub,
   onSelectLeaf,
 }: {
@@ -153,6 +159,11 @@ export function MoneyUniverse({
   selectedLeaf: string | null;
   zoom: number;
   compact: boolean;
+  /** Hub keys and node ids for the camera to frame — the answer tour's stop. Null shows the whole map. */
+  focus?: string[] | null;
+  /** Screen taken by an overlay on the left and at the bottom, so what is framed sits clear of it. */
+  insetLeft?: number;
+  insetBottom?: number;
   onSelectHub: (key: HubKey) => void;
   onSelectLeaf: (id: string) => void;
 }) {
@@ -162,6 +173,7 @@ export function MoneyUniverse({
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [hovered, setHovered] = useState<HubKey | null>(null);
   const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [dragging, setDragging] = useState(false);
   const drag = useRef<{ x: number; y: number; px: number; py: number } | null>(null);
 
   useEffect(() => {
@@ -190,9 +202,48 @@ export function MoneyUniverse({
   const dimmed = (key: HubKey) => focusHub !== null && focusHub !== key && !active.has(key);
   const hubByKey = new Map(graph.hubs.map((hub) => [hub.key, hub]));
 
+  // The camera. Framing a stop: centre on what it names (each node with its
+  // hub, for context), as close as fits, clear of any overlay. Otherwise the
+  // whole map — shrunk to fit above an overlay when one is showing.
+  const camera = useMemo(() => {
+    const ox = insetLeft / 2;
+    const oy = -insetBottom / 2;
+    const room = { w: Math.max(1, size.w - insetLeft), h: Math.max(1, size.h - insetBottom) };
+    const points: { x: number; y: number }[] = [];
+    if (focus && !still) {
+      for (const id of focus) {
+        const hubAt = layout.hubs.find((at) => at.key === id);
+        if (hubAt) {
+          points.push(hubAt);
+          continue;
+        }
+        const leafAt = layout.leaves.find((item) => item.leaf.id === id);
+        if (!leafAt) continue;
+        points.push(leafAt);
+        const parent = layout.hubs.find((at) => at.key === leafAt.leaf.hub);
+        if (parent) points.push(parent);
+      }
+    }
+    if (points.length === 0) {
+      const fit = insetLeft || insetBottom ? Math.max(0.72, Math.min(room.w / Math.max(1, size.w), room.h / Math.max(1, size.h))) : 1;
+      return `translate(${ox}px, ${oy}px) scale(${zoom * fit}) translate(${pan.x}px, ${pan.y}px)`;
+    }
+    const xs = points.map((p) => p.x);
+    const ys = points.map((p) => p.y);
+    const pad = compact ? 44 : 70;
+    const spanW = Math.max(...xs) - Math.min(...xs) + pad * 2;
+    const spanH = Math.max(...ys) - Math.min(...ys) + pad * 2;
+    const cx = (Math.max(...xs) + Math.min(...xs)) / 2;
+    const cy = (Math.max(...ys) + Math.min(...ys)) / 2;
+    const most = compact ? MAX_FRAME_SCALE.compact : MAX_FRAME_SCALE.wide;
+    const scale = Math.max(1, Math.min(most, (room.w * 0.85) / spanW, (room.h * 0.85) / spanH));
+    return `translate(${ox}px, ${oy}px) scale(${scale}) translate(${-cx}px, ${-cy}px)`;
+  }, [focus, layout, size, compact, insetLeft, insetBottom, zoom, pan, still]);
+
   const onPointerDown = (event: ReactPointerEvent<SVGSVGElement>) => {
     if ((event.target as Element).closest("[data-node]")) return;
     drag.current = { x: event.clientX, y: event.clientY, px: pan.x, py: pan.y };
+    setDragging(true);
     event.currentTarget.setPointerCapture(event.pointerId);
   };
   const onPointerMove = (event: ReactPointerEvent<SVGSVGElement>) => {
@@ -204,6 +255,7 @@ export function MoneyUniverse({
   };
   const endDrag = () => {
     drag.current = null;
+    setDragging(false);
   };
 
   const showLeafLabel = (leaf: GraphLeaf) =>
@@ -263,7 +315,8 @@ export function MoneyUniverse({
             />
           ))}
 
-          <g transform={`scale(${zoom}) translate(${pan.x} ${pan.y})`}>
+          {/* A CSS transform, so the camera glides between stops; never while you drag. */}
+          <g style={{ transform: camera, transition: dragging || still ? "none" : "transform 900ms cubic-bezier(0.2, 0.8, 0.2, 1)" }}>
             {/* Centre to hubs. */}
             {layout.hubs.map((at) => {
               const on = active.has(at.key) || selectedHub === at.key;

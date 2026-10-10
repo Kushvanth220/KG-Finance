@@ -42,6 +42,7 @@ export function WorkspaceConversation({
   onAnalyse,
   expanded,
   onExpandedChange,
+  hideFolded = false,
 }: {
   chat: AssistantChat;
   mode: ConversationMode;
@@ -57,6 +58,8 @@ export function WorkspaceConversation({
   onAnalyse: () => void;
   expanded: boolean;
   onExpandedChange: (expanded: boolean) => void;
+  /** The answer is playing on the map: the folded view shows no bubbles, so it is not said twice. */
+  hideFolded?: boolean;
 }) {
   const [withContext, setWithContext] = useState(true);
   const [teamOpen, setTeamOpen] = useState(false);
@@ -78,7 +81,8 @@ export function WorkspaceConversation({
     void chat.handleSend(question);
   };
 
-  const shown = expanded ? messages : messages.slice(-2);
+  const quiet = hideFolded && !expanded;
+  const shown = expanded ? messages : quiet ? [] : messages.slice(-2);
 
   if (mode === "voice") {
     return (
@@ -178,7 +182,7 @@ export function WorkspaceConversation({
             </div>
           </div>
           <div
-            className={cn("space-y-2 overflow-y-auto px-3 pb-2 pt-1.5", expanded ? "max-h-[44dvh]" : "max-h-32")}
+            className={cn("space-y-2 overflow-y-auto px-3 pt-1.5", quiet ? "pb-0" : "pb-2", expanded ? "max-h-[44dvh]" : "max-h-32")}
             data-lenis-prevent
           >
             {shown.map((message) => (
@@ -197,7 +201,7 @@ export function WorkspaceConversation({
                 </div>
               </div>
             ))}
-            {loading && !pendingConfirm ? (
+            {loading && !pendingConfirm && !quiet ? (
               <div className="ws-shimmer h-6 w-40 rounded-full" aria-label={`${assistantName} is thinking`} />
             ) : null}
             <div ref={bottomRef} />
