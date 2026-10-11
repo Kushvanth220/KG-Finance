@@ -39,7 +39,10 @@ export function AssistantFloatingButton() {
       <AssistantWakeListener paused={liveNow || autoStartVoice} />
 
       {!open ? (
-      <div className="fixed z-50 right-4 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] md:bottom-8 md:right-8 flex flex-col items-end gap-2.5 pointer-events-none">
+      <div
+        className="fixed z-50 right-4 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] md:bottom-8 md:right-8 flex flex-col items-end gap-2.5 pointer-events-none"
+        style={{ viewTransitionName: "kg-assistant" }}
+      >
         {canWakeByName ? (
           <button
             type="button"

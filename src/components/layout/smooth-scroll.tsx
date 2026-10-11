@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect } from "react";
 import { usePathname } from "next/navigation";
 import Lenis from "lenis";
 
@@ -56,8 +56,10 @@ export function SmoothScroll() {
   }, []);
 
   // A new screen starts at its top. Lenis keeps its own scroll position, so
-  // without this a short page can open halfway down the one before it.
-  useEffect(() => {
+  // without this a short page can open halfway down the one before it. It runs
+  // as the page is put in, before the browser pictures it for the page move;
+  // scrolling after that would slide the new page under its own ripple.
+  useLayoutEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
   }, [pathname]);
 

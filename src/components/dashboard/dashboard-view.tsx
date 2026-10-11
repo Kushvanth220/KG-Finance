@@ -14,18 +14,25 @@ import { PersonTabs } from "@/components/ui/person-tabs";
 import { ChartTypePicker, useChartType } from "@/components/dashboard/chart-type-picker";
 import { ExpenseCategoryDonutChart, IncomeDonutChart } from "@/components/dashboard/dashboard-charts";
 import { SpendCategoryManager } from "@/components/spend/spend-category-manager";
+import { AddIncomeSheet } from "@/components/income/add-income-sheet";
 import { useFinanceStore } from "@/store/finance-store";
 import { useAssistantPreferencesStore } from "@/store/assistant-preferences-store";
 import {
   getIncomeForPeriod,
+  getPersonDebtOutstandingSummary,
   getPersonExpensesForPeriod,
   getTransactionExpenseShare,
   sumPersonExpenses,
 } from "@/lib/calculations";
-import { NeedsYou, pendingFlexTotal } from "@/components/dashboard/needs-you";
+import { NeedsYou } from "@/components/dashboard/needs-you";
+import { HomeDeck } from "@/components/dashboard/home-deck";
+import { MoneyStory } from "@/components/dashboard/money-story";
+import { FlexWeekCard } from "@/components/dashboard/flex-week-card";
+import { buildMoneyStory, storyPeriod, storyWindow } from "@/lib/money-story";
+import { useRulesStore } from "@/store/rules-store";
+import { findFlexRule } from "@/lib/flex";
 import { motion, useReducedMotion } from "motion/react";
 import { enterDelay } from "@/lib/motion-presets";
-import { useRulesStore } from "@/store/rules-store";
 import { zonedToday } from "@/lib/zoned-date";
 import { getAccountsForPerson } from "@/lib/accounts";
 import { buildLearnedCategorySpending } from "@/lib/learn-spending-categories";
@@ -44,7 +51,6 @@ import {
   resolveRange,
   type RangeChoice,
 } from "@/components/dashboard/date-range-filter";
-import { PeriodStory } from "@/components/dashboard/month-story";
 import { DebtsSummary } from "@/components/dashboard/debts-summary";
 import { DueBills } from "@/components/spend/due-bills";
 import { BudgetBar, categorySpentThisMonth } from "@/components/spend/budget-bar";
@@ -133,12 +139,13 @@ export function DashboardView() {
   const { incomeEntries, incomeSources, transactions, spendCategories, accounts, monthlyExpenses } =
     useFinanceStore();
   const reminders = useAssistantPreferencesStore((state) => state.structuredReminders);
-  const flexDeposits = useFinanceStore((state) => state.flexDeposits);
-  const ruleList = useRulesStore((state) => state.rules);
-  const ruleEntries = useRulesStore((state) => state.entries);
+  const assistantName = useAssistantPreferencesStore((state) => state.getAssistantName());
+  const debts = useFinanceStore((state) => state.debts);
+  const hasFlex = useRulesStore((state) => !!findFlexRule(state.rules));
   const { configured: syncConfigured, isLive, isSyncing, lastSyncedAt } = useLiveSync();
   const [person, setPerson] = useState<Person>("kushvanth");
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
+  const [incomeOpen, setIncomeOpen] = useState(false);
   const [unusedOpen, setUnusedOpen] = useState(false);
   // How each panel is drawn — a viewing preference kept per browser.
   const [incomeChart, setIncomeChart] = useChartType("income", "donut");
@@ -160,11 +167,22 @@ export function DashboardView() {
       ),
     [accounts, person]
   );
-  const nextDue = useMemo(
-    () => upcomingFor(monthlyExpenses, transactions, reminders, person, 7)[0] ?? null,
+  const dueThisWeek = useMemo(
+    () => upcomingFor(monthlyExpenses, transactions, reminders, person, 7),
     [monthlyExpenses, transactions, reminders, person]
   );
+  const nextDue = dueThisWeek[0] ?? null;
   const greeting = greetingFor(new Date().getHours());
+
+  // The same test DebtsSummary uses to show itself, so the deck never holds an empty card.
+  const hasDebts = useMemo(() => {
+    const summary = getPersonDebtOutstandingSummary(debts, person);
+    return (
+      summary.activeDebts.length > 0 ||
+      summary.clearedDebts.length > 0 ||
+      getAccountsForPerson(accounts, person).some((a) => a.type === "credit" && a.balance > 0)
+    );
+  }, [debts, accounts, person]);
 
   const sourceNames = useMemo(
     () => Object.fromEntries(incomeSources.map((source) => [source.id, source.name])),
@@ -253,17 +271,6 @@ export function DashboardView() {
     [slicesTotal, spendOffsets, unmappedSpend]
   );
 
-  // The dial and the spending panel are the same rows, so they are the same
-  // number — both this person's SHARE, never the face value of a shared bill.
-  const dialSpend = spendTotal;
-
-  // Money earned in this period whose payout has not landed yet, so the
-  // verdict is not "you overspent" on a month that is only awaiting a deposit.
-  const pendingIncome = useMemo(() => {
-    if (person !== "kushvanth") return 0;
-    return pendingFlexTotal(ruleList, ruleEntries, flexDeposits ?? [], incomeEntries, incomeSources, zonedToday()).total;
-  }, [person, ruleList, ruleEntries, flexDeposits, incomeEntries, incomeSources]);
-
   /**
    * The mark beside the greeting: this person's spend per day for the last
    * sixteen days. Deliberately NOT tied to the range filter above — the mark
@@ -291,6 +298,34 @@ export function DashboardView() {
     }
     return out;
   }, [transactions, person]);
+
+  /**
+   * The story at the front of the deck. While the range is still running it is
+   * measured against the same stretch of the period before, not all of it.
+   */
+  const story = useMemo(() => {
+    const span = storyWindow(range);
+    const prevExpenses = getPersonExpensesForPeriod(transactions, person, range.prevStart, span.prevCut);
+    return buildMoneyStory({
+      period: storyPeriod(rangeChoice.preset, range, span.ongoing),
+      incomeTotal,
+      spendTotal,
+      categories: spentCategories,
+      prevCategories: buildLearnedCategorySpending(
+        transactions,
+        person,
+        spendCategories,
+        prevExpenses,
+        range.prevStart,
+        span.prevCut
+      ).spent,
+      pace: {
+        now: sumPersonExpenses(transactions, person, range.start, span.nowEnd),
+        then: sumPersonExpenses(transactions, person, range.prevStart, span.prevCut),
+      },
+      due: dueThisWeek,
+    });
+  }, [range, rangeChoice.preset, transactions, person, spendCategories, incomeTotal, spendTotal, spentCategories, dueThisWeek]);
 
   const budgeted = useMemo(() => spendCategories.filter((c) => (c.budget ?? 0) > 0), [spendCategories]);
 
@@ -362,14 +397,24 @@ export function DashboardView() {
             </p>
           </div>
         </div>
-        <Link
-          href="/spend"
-          className="inline-flex shrink-0 items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-semibold text-white shadow-sm"
-          style={{ backgroundColor: accent }}
-        >
-          <Plus className="w-3.5 h-3.5" />
-          Spend
-        </Link>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setIncomeOpen(true)}
+            className="inline-flex items-center gap-1 rounded-xl bg-positive px-3 py-1.5 text-xs font-semibold text-white shadow-sm"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Income
+          </button>
+          <Link
+            href="/spend"
+            className="inline-flex items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-semibold text-white shadow-sm"
+            style={{ backgroundColor: accent }}
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Spend
+          </Link>
+        </div>
       </div>
 
       <Reveal {...section(0)}>
@@ -382,37 +427,36 @@ export function DashboardView() {
       </Reveal>
 
       <Reveal {...section(1)}>
-        <DateRangeFilter value={rangeChoice} onChange={setRangeChoice} accent={accent} />
+        <DateRangeFilter
+          value={rangeChoice}
+          onChange={setRangeChoice}
+          accent={accent}
+          reminders={reminders}
+          person={person}
+        />
       </Reveal>
 
+      {/* The deck: one card in front, swipe for the next. */}
       <Reveal {...section(2)}>
-      <PeriodStory
-        income={incomeTotal}
-        spend={dialSpend}
-        pending={pendingIncome}
-        start={range.start}
-        end={range.end}
-        label={range.label}
-      />
-      </Reveal>
-
-      <Reveal {...section(3)}>
-        <NeedsYou person={person} />
-      </Reveal>
-      <Reveal>
-        <DueBills person={person} />
-      </Reveal>
-      <Reveal>
-        <UpcomingStrip person={person} />
-      </Reveal>
-
-      {/* Reads the same store the Accounts page writes to, so the two agree. */}
-      <Reveal {...section(4)}>
-        <AccountBalances person={person} />
-      </Reveal>
-
-      {/* Income: the headline, the delta, one chart in the shape the user picked. */}
-      <Reveal>
+        <HomeDeck
+          cards={[
+            {
+              id: "story",
+              label: "Story",
+              // A new person, range or set of screens (data arriving after the first paint)
+              // starts the story again from its first screen.
+              node: (
+                <MoneyStory
+                  key={`${person}-${range.label}-${story.map((s) => s.id).join(".")}`}
+                  slides={story}
+                  title={range.short}
+                  narrator={assistantName}
+                />
+              ),
+            },
+            // Flex is Kushvanth's: G's tab never shows it.
+            ...(person === "kushvanth" && hasFlex ? [{ id: "flex", label: "Flex", node: <FlexWeekCard /> }] : []),
+            { id: "income", label: "Income", node: (
         <GlassCard strong className="!p-3 border border-positive/20">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
@@ -427,13 +471,22 @@ export function DashboardView() {
               />
               <PeriodDelta now={incomeTotal} prev={incomePrevTotal} vs={range.prevLabel} goodWhenUp />
             </div>
-            <button
-              type="button"
-              onClick={() => openIncomeHistory()}
-              className="hit shrink-0 text-[10px] font-medium text-accent"
-            >
-              View all
-            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIncomeOpen(true)}
+                className="hit inline-flex items-center gap-0.5 text-[10px] font-semibold text-positive"
+              >
+                <Plus className="w-3 h-3" /> Add
+              </button>
+              <button
+                type="button"
+                onClick={() => openIncomeHistory()}
+                className="hit text-[10px] font-medium text-accent"
+              >
+                View all
+              </button>
+            </div>
           </div>
 
           <div className="my-2">
@@ -463,10 +516,8 @@ export function DashboardView() {
             </>
           )}
         </GlassCard>
-      </Reveal>
-
-      {/* Spending: the headline, the delta, one chart. */}
-      <Reveal>
+            ) },
+            { id: "spending", label: "Spending", node: (
         <GlassCard strong className="!p-3 border border-negative/20">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
@@ -603,10 +654,23 @@ export function DashboardView() {
             </div>
           )}
         </GlassCard>
+            ) },
+            // Reads the same store the Accounts page writes to, so the two agree.
+            { id: "accounts", label: "Accounts", node: <AccountBalances person={person} /> },
+            ...(hasDebts ? [{ id: "debts", label: "Debts", node: <DebtsSummary person={person} /> }] : []),
+          ]}
+        />
       </Reveal>
 
-      <Reveal {...section(6)}>
-        <DebtsSummary person={person} />
+      {/* Below the deck, only what is waiting on you. */}
+      <Reveal>
+        <NeedsYou person={person} />
+      </Reveal>
+      <Reveal>
+        <DueBills person={person} />
+      </Reveal>
+      <Reveal>
+        <UpcomingStrip person={person} />
       </Reveal>
 
       {/* Anything a rule collects, shown where the user already looks. */}
@@ -616,6 +680,8 @@ export function DashboardView() {
         open={categoryManagerOpen}
         onClose={() => setCategoryManagerOpen(false)}
       />
+
+      {incomeOpen ? <AddIncomeSheet person={person} onClose={() => setIncomeOpen(false)} /> : null}
     </motion.div>
   );
 }

@@ -149,7 +149,8 @@ export function MobileBottomNav() {
         </div>
       )}
 
-      <nav className="md:hidden fixed inset-x-0 bottom-0 z-50 pointer-events-none">
+      {/* Named so it stays on top, still and live, while a page changes behind it (see globals.css). */}
+      <nav className="md:hidden fixed inset-x-0 bottom-0 z-50 pointer-events-none" style={{ viewTransitionName: "kg-tabbar" }}>
         <div className="mx-auto max-w-lg px-4 pb-[calc(0.65rem+env(safe-area-inset-bottom))] pointer-events-auto">
           <div className="bottom-nav-shell grid grid-cols-4 items-end gap-1 px-1 pt-2 pb-1">
             {primaryNavItems.map((tab) => {

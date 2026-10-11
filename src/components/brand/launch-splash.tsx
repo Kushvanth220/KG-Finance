@@ -5,10 +5,13 @@ import { preload } from "react-dom";
 import { LionReveal } from "@/components/brand/lion-reveal";
 import { LION_SRC, type LionFit, type LionPlacement } from "@/components/brand/lion-dust";
 import {
+  AWAY_REPLAY_MS,
   endLaunch,
   launchMode,
+  markLeft,
   markLionPerformed,
   releaseContent,
+  replaysAfterAway,
   setSplashCovering,
   subscribeLaunch,
 } from "@/components/brand/launch-state";
@@ -18,12 +21,13 @@ import { waitForStoreHydration } from "@/store/finance-store";
 /**
  * The launch screen.
  *
- * Every time someone arrives — opening the site, reloading it, or coming back
- * to the tab from another site or app — the lion gathers itself out of
+ * When someone arrives — a new visit, or coming back after five minutes or
+ * more away in another tab, site or app — the lion gathers itself out of
  * ice-blue dust, the name rises under it, and the screen lifts off the app. A
- * tap or a key skips it. It never replays over an open dialog (a half-filled
- * form, a photo picker, the assistant), and with reduced motion it is only
- * the lion at rest while the data loads.
+ * tap or a key skips it. Back sooner than that, or a reload, and it is only
+ * the lion at rest while the data loads (and nothing at all on a plain tab
+ * switch). It never replays over an open dialog (a half-filled form, a photo
+ * picker, the assistant), and with reduced motion it is only the resting lion.
  *
  * The server renders it as the bare navy ground, so the app never flashes in
  * first; what to play is decided on the client.
@@ -91,23 +95,50 @@ export function LaunchSplash() {
     };
   }, []);
 
-  // Leaving the tab arms the next entrance; coming back starts it.
+  // Leaving the tab starts the clock. Back within five minutes: nothing
+  // plays. Away five minutes or more: the entrance plays again. Once the five
+  // minutes pass the splash is armed in the background, so the first frame on
+  // coming back is the lion, not a flash of the app; if the browser's timers
+  // slept through it, it starts on the way back in instead.
   useEffect(() => {
+    let leftAt = 0;
+    let timer = 0;
+    const canReplay = () => !reducedMotion() && !dialogOpen();
     const arm = () =>
-      setShowing((s) => ({ run: (s?.run ?? 0) + 1, phase: "armed", out: false }));
-    const begin = () =>
-      setShowing((s) => (s && s.phase === "armed" ? { ...s, phase: "dust" } : s));
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") begin();
-      else if (!reducedMotion() && !dialogOpen()) arm();
+      setShowing((s) => (s?.phase === "armed" ? s : { run: (s?.run ?? 0) + 1, phase: "armed", out: false }));
+    const leave = () => {
+      leftAt = Date.now();
+      markLeft(leftAt);
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        if (document.visibilityState === "hidden" && canReplay()) arm();
+      }, AWAY_REPLAY_MS);
     };
+    const comeBack = () => {
+      window.clearTimeout(timer);
+      if (!leftAt) return;
+      const away = Date.now() - leftAt;
+      leftAt = 0;
+      if (replaysAfterAway(away) && canReplay()) {
+        setShowing((s) => (s?.phase === "armed" ? { ...s, phase: "dust" } : { run: (s?.run ?? 0) + 1, phase: "dust", out: false }));
+      } else {
+        // Back early, or straight into an open form: no entrance.
+        setShowing((s) => (s?.phase === "armed" ? null : s));
+      }
+    };
+    const onVisibility = () => (document.visibilityState === "visible" ? comeBack() : leave());
+    // A reload or a navigation: remember the moment, so the next load knows how long it has been.
+    const onPageHide = () => markLeft();
     const onPageShow = (event: PageTransitionEvent) => {
-      if (event.persisted) begin();
+      if (event.persisted) comeBack();
     };
     document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", onPageHide);
     window.addEventListener("pageshow", onPageShow);
     return () => {
+      window.clearTimeout(timer);
       document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", onPageHide);
       window.removeEventListener("pageshow", onPageShow);
     };
   }, []);

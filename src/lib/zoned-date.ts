@@ -46,6 +46,27 @@ export function zonedMonth(now: Date = new Date()): string {
   return zonedToday(now).slice(0, 7);
 }
 
+/**
+ * The workspace's wall clock as a Date whose LOCAL fields read that time.
+ *
+ * Schedules say "6:30 AM" with no zone. A server running in UTC compares them
+ * against this, so 6:30 means 6:30 here rather than 6:30 in London.
+ */
+export function zonedWallClock(now: Date = new Date()): Date {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: APP_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(now);
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+  return new Date(get("year"), get("month") - 1, get("day"), get("hour") % 24, get("minute"), get("second"));
+}
+
 /** "Wednesday, September 2, 2026" — for reading aloud. */
 export function zonedLongDate(now: Date = new Date()): string {
   return new Intl.DateTimeFormat("en-US", {

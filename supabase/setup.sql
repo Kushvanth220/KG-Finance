@@ -146,6 +146,16 @@ create table if not exists public.push_subscriptions (
 create index if not exists push_subscriptions_workspace_idx
   on public.push_subscriptions (workspace_id);
 
+-- Each alarm ring claimed once, so the every-minute timer never sends it twice.
+-- The timer itself is in supabase/alarm-timer.sql.
+create table if not exists public.push_log (
+  key text primary key,
+  workspace_id text not null,
+  sent_at timestamptz not null default now()
+);
+
+create index if not exists push_log_sent_at_idx on public.push_log (sent_at);
+
 -- ---------------------------------------------------------------------------
 -- Row level security: open to the anon key (no login in this app).
 -- ---------------------------------------------------------------------------
@@ -156,6 +166,7 @@ alter table public.ai_chat_sessions enable row level security;
 alter table public.ai_chat_messages enable row level security;
 alter table public.ai_usage enable row level security;
 alter table public.push_subscriptions enable row level security;
+alter table public.push_log enable row level security;
 
 drop policy if exists "open workspace finance" on public.workspace_finance;
 create policy "open workspace finance" on public.workspace_finance
@@ -183,4 +194,8 @@ create policy "open ai usage" on public.ai_usage
 
 drop policy if exists "open push subscriptions" on public.push_subscriptions;
 create policy "open push subscriptions" on public.push_subscriptions
+  for all to anon, authenticated using (true) with check (true);
+
+drop policy if exists "open push log" on public.push_log;
+create policy "open push log" on public.push_log
   for all to anon, authenticated using (true) with check (true);

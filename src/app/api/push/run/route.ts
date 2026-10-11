@@ -8,13 +8,13 @@ import {
   listPushSubscriptions,
 } from "@/lib/ai/chat-store";
 import { findFlexRule } from "@/lib/flex";
-import { blocksAwaitingTips, expectedPayouts } from "@/lib/flex-deposits";
+import { blocksAwaitingTips } from "@/lib/flex-deposits";
 import type { Rule, RuleEntry } from "@/lib/rules/types";
-import { dueLabel, isDueSoon, reminderFromLegacyLine, type Reminder } from "@/lib/ai/reminders";
+import { dueLabel, formatReminderAmount, isDueSoon, type Reminder } from "@/lib/ai/reminders";
 import { getDueDateForExpense, getMonthlyExpensePaid } from "@/lib/monthly-expense-tracker";
 import { zonedToday } from "@/lib/zoned-date";
 import { formatCurrency } from "@/lib/formatters";
-import type { FlexDeposit, IncomeEntry, IncomeSource, MonthlyExpense, Transaction } from "@/types";
+import type { MonthlyExpense, Transaction } from "@/types";
 
 export const dynamic = "force-dynamic";
 
@@ -23,8 +23,9 @@ export const dynamic = "force-dynamic";
  * it works out what is due for the workspace and pushes one notification to
  * every device that asked for them.
  *
- * Reminders are read from the same rendered lines the app syncs, so a snooze
- * or a "done" made on either phone is respected here without any extra state.
+ * Reminders are read from the same synced data the app edits, so a snooze or
+ * a "done" made on either phone is respected here without any extra state.
+ * Alarms and timed reminders are sent at their minute by /api/push/tick.
  */
 
 const BILL_DAYS_AHEAD = 3;
@@ -41,12 +42,11 @@ function dueToday(): { iso: string; date: Date } {
   return { iso, date: new Date(`${iso}T00:00:00`) };
 }
 
-function dueReminders(lines: string[], today: Date): Due[] {
-  return lines
-    .map((line, i) => reminderFromLegacyLine(line, `r${i}`))
-    .filter((reminder: Reminder) => isDueSoon(reminder, today))
+function dueReminders(reminders: Reminder[], today: Date): Due[] {
+  return reminders
+    .filter((reminder) => isDueSoon(reminder, today))
     .map((reminder) => ({
-      text: `${reminder.text} — ${dueLabel(reminder, today).toLowerCase()}`,
+      text: `${reminder.text}${reminder.amount ? ` (${formatReminderAmount(reminder.amount)})` : ""} — ${dueLabel(reminder, today).toLowerCase()}`,
       person: reminder.person ?? null,
     }));
 }
@@ -70,16 +70,11 @@ function dueBills(bills: MonthlyExpense[], transactions: Transaction[], today: D
   return out;
 }
 
-/** Blocks whose tips are still blank two days on, and a payout landing today. */
-function flexNudges(
-  rules: Rule[],
-  entries: RuleEntry[],
-  deposits: FlexDeposit[],
-  incomeEntries: IncomeEntry[],
-  incomeSources: IncomeSource[],
-  todayIso: string,
-  now: Date
-): Due[] {
+/**
+ * Blocks whose tips are still blank two days on. Payouts are not chased:
+ * Flex income is entered by hand, so the app has no deposit to wait for.
+ */
+function flexNudges(rules: Rule[], entries: RuleEntry[], now: Date): Due[] {
   const rule = findFlexRule(rules);
   if (!rule) return [];
   const out: Due[] = [];
@@ -93,23 +88,6 @@ function flexNudges(
       .map((date) => new Date(`${date}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "numeric", day: "numeric" }).replace(",", ""));
     out.push({
       text: `Tips still blank on ${waiting.length} Flex ${waiting.length === 1 ? "block" : "blocks"} (${days.join(", ")}${dates.length > 3 ? ", …" : ""})`,
-      person: "kushvanth",
-    });
-  }
-
-  // Money that should be showing up today, and money that is late.
-  const landing = expectedPayouts(rule, entries, deposits, incomeEntries, incomeSources, todayIso).filter(
-    (payout) => payout.status === "due"
-  );
-  const total = landing.reduce((sum, payout) => sum + payout.total, 0);
-  if (landing.length > 0) {
-    const late = landing.filter((payout) => payout.overdueDays > 0).length;
-    out.push({
-      text: rule.payout.autoPost
-        ? `Flex payout ${formatCurrency(total)} written today — check it matches the bank`
-        : late > 0
-          ? `Flex money not recorded yet: ${formatCurrency(total)} from ${landing.length} ${landing.length === 1 ? "day" : "days"} — record it when it shows`
-          : `Flex should pay ${formatCurrency(total)} today — record it when it shows`,
       person: "kushvanth",
     });
   }
@@ -164,9 +142,6 @@ export async function GET(request: Request) {
       fetchWorkspaceFinance() as Promise<{
         monthlyExpenses?: MonthlyExpense[];
         transactions?: Transaction[];
-        incomeEntries?: IncomeEntry[];
-        incomeSources?: IncomeSource[];
-        flexDeposits?: FlexDeposit[];
       } | null>,
       listPushSubscriptions(),
       fetchWorkspaceRules().catch(() => ({ available: false, row: null })),
@@ -175,16 +150,8 @@ export async function GET(request: Request) {
     const rulesData = rulesDoc.row?.data;
     const due = [
       ...dueBills(finance?.monthlyExpenses ?? [], finance?.transactions ?? [], date),
-      ...dueReminders(prefs?.reminders ?? [], date),
-      ...flexNudges(
-        (rulesData?.rules ?? []) as Rule[],
-        (rulesData?.entries ?? []) as RuleEntry[],
-        finance?.flexDeposits ?? [],
-        finance?.incomeEntries ?? [],
-        finance?.incomeSources ?? [],
-        iso,
-        new Date()
-      ),
+      ...dueReminders(prefs?.reminder_data ?? [], date),
+      ...flexNudges((rulesData?.rules ?? []) as Rule[], (rulesData?.entries ?? []) as RuleEntry[], new Date()),
     ];
     if (dry) {
       const preview = (person: string | null) => {

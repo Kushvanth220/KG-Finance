@@ -330,19 +330,57 @@ export const ASSISTANT_FUNCTION_DECLARATIONS = [
         repeat: {
           type: "string",
           description:
-            "How often it repeats: once, weekly, monthly, or yearly. Set this whenever they say a cycle like 'every month' or 'every Friday'.",
+            "How often it repeats: once, daily, weekdays (Mon-Fri), weekends, weekly, biweekly (every other week), monthly, yearly, or custom (with every + unit). Set this whenever they say a cycle like 'every month', 'every Friday', 'every other Friday' or 'every 3 days'.",
         },
+        alarm: {
+          type: "boolean",
+          description:
+            "true when they ask for an ALARM (wake me, ring, alert me at a time): it rings full screen at its time until swiped. Needs a time.",
+        },
+        times: {
+          type: "array",
+          items: { type: "string" },
+          description: "Several times of day, 24h HH:mm, e.g. ['08:00','20:00'] for 'at 8 and 8'. Use instead of time when there is more than one.",
+        },
+        weekdays: {
+          type: "array",
+          items: { type: "number" },
+          description: "For weekly on several days (or custom weeks): 0=Sunday .. 6=Saturday, e.g. Monday and Thursday -> [1,4].",
+        },
+        nth: {
+          type: "number",
+          description: "Monthly on a weekday: 1-4 for first to fourth, -1 for last; give weekday too. 'First Monday of the month' -> nth 1, weekday 1.",
+        },
+        every: { type: "number", description: "For custom: every N units, e.g. every 3 days -> every 3, unit day." },
+        unit: { type: "string", description: "For custom: day, week, month or year." },
+        count: { type: "number", description: "Recurring: stop after this many times ('10 more payments' -> 10)." },
+        lead_minutes: { type: "number", description: "Alarms: a heads-up this many minutes before it rings." },
+        snooze_minutes: { type: "number", description: "Alarms: how long a snooze lasts. Default 10." },
+        note: { type: "string", description: "A short extra note shown with it." },
         day_of_month: {
           type: "number",
-          description: "1-31, for monthly or yearly. E.g. 'the 3rd of every month' -> 3.",
+          description:
+            "1-31, for monthly or yearly. E.g. 'the 3rd of every month' -> 3. 'The last day of the month' -> 31.",
         },
         weekday: {
           type: "number",
-          description: "0=Sunday .. 6=Saturday, for weekly. E.g. 'every Friday' -> 5.",
+          description:
+            "0=Sunday .. 6=Saturday, for weekly. E.g. 'every Friday' -> 5. For biweekly without a date, the next such day starts the cycle.",
         },
         month: { type: "number", description: "1-12, for yearly only." },
-        date: { type: "string", description: "yyyy-MM-dd, for a one-time reminder." },
+        date: {
+          type: "string",
+          description: "yyyy-MM-dd. For once, the day. For biweekly, the first occurrence (it fixes which weeks).",
+        },
         time: { type: "string", description: "24h HH:mm, only if they gave a time of day." },
+        amount: {
+          type: "number",
+          description: "Dollars, when it is a payment ('rent is $1,450'). Leave out otherwise.",
+        },
+        until: {
+          type: "string",
+          description: "yyyy-MM-dd, the last date a recurring reminder can come due ('until March 2027' -> its final due day).",
+        },
         lead_days: {
           type: "number",
           description:
@@ -448,13 +486,26 @@ export const ASSISTANT_FUNCTION_DECLARATIONS = [
           description: "Words from the existing reminder, enough to identify it uniquely.",
         },
         new_text: { type: "string", description: "Replacement wording, if they changed it." },
-        repeat: { type: "string", description: "once, weekly, monthly, or yearly." },
-        day_of_month: { type: "number", description: "1-31, for monthly or yearly." },
-        weekday: { type: "number", description: "0=Sunday .. 6=Saturday, for weekly." },
+        repeat: { type: "string", description: "once, daily, weekdays, weekends, weekly, biweekly, monthly, yearly, or custom." },
+        alarm: { type: "boolean", description: "true to make it an alarm (rings full screen), false to make it a plain reminder." },
+        times: { type: "array", items: { type: "string" }, description: "All times of day, 24h HH:mm; replaces the old ones." },
+        weekdays: { type: "array", items: { type: "number" }, description: "Days for weekly, 0=Sunday .. 6=Saturday; replaces the old ones." },
+        nth: { type: "number", description: "Monthly on a weekday: 1-4 or -1 for last (with weekday)." },
+        every: { type: "number", description: "Custom: every N units." },
+        unit: { type: "string", description: "Custom: day, week, month or year." },
+        count: { type: "number", description: "Stop after this many times; 0 removes the limit." },
+        lead_minutes: { type: "number", description: "Alarm heads-up, minutes before; 0 removes it." },
+        snooze_minutes: { type: "number", description: "Alarm snooze length in minutes." },
+        paused: { type: "boolean", description: "true to pause it, false to resume." },
+        note: { type: "string", description: "Replacement note; empty removes it." },
+        day_of_month: { type: "number", description: "1-31, for monthly or yearly. 31 = last day of the month." },
+        weekday: { type: "number", description: "0=Sunday .. 6=Saturday, for weekly, or the weekday of nth." },
         month: { type: "number", description: "1-12, for yearly." },
-        date: { type: "string", description: "yyyy-MM-dd, for a one-time reminder." },
+        date: { type: "string", description: "yyyy-MM-dd: the day of a one-time reminder, or the first of a biweekly one." },
         time: { type: "string", description: "24h HH:mm." },
         lead_days: { type: "number", description: "Days before the due date to raise it." },
+        amount: { type: "number", description: "Dollars it is for; 0 removes the amount." },
+        until: { type: "string", description: "yyyy-MM-dd last due date for a recurring reminder, or 'none' to make it open-ended." },
         user_confirmed: {
           type: "boolean",
           description: "Only true after they said yes to this exact change.",

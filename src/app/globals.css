@@ -19,6 +19,19 @@
      --------------------------------------------------------------------- */
   --background: #f4f8ff;
   --foreground: #03195b;
+  /* The ringing screen is night in both themes: the lion's own navy and ice. */
+  --ring-top: #03195b;
+  --ring-mid: #041045;
+  --ring-bottom: #020818;
+  --ring-glow: rgba(55, 129, 252, 0.32);
+  --ring-ice: #cbe9fd;
+  --ring-ice-dim: rgba(203, 233, 253, 0.66);
+  /* Home's story screens: bold in both themes, white type on each (all clear 4.5:1). */
+  --story-green: linear-gradient(160deg, #0b7a4b, #0b2cb1);
+  --story-red: linear-gradient(160deg, #b3303f, #5b3fd1);
+  --story-blue: linear-gradient(160deg, #1951fc, #03195b);
+  --story-amber: linear-gradient(160deg, #a35f00, #b3303f);
+  --story-violet: linear-gradient(160deg, #5b3fd1, #0b6f96);
   --glass-bg: rgba(255, 255, 255, 0.52);
   --glass-border: rgba(11, 44, 177, 0.13);
   --glass-shadow: 0 8px 26px rgba(3, 25, 91, 0.08), 0 1px 3px rgba(3, 25, 91, 0.04);
@@ -2282,4 +2295,92 @@ input[type="number"] {
 @media (prefers-reduced-motion: reduce) {
   /* The map still says everything standing still; only the drift goes. */
   .ws-spin, .ws-spin-reverse, .ws-breathe, .ws-twinkle, .ws-flow, .ws-ping, .ws-shimmer, .ws-tour-line { animation: none; }
+}
+
+/* ---------------------------------------------------------------------
+   The ringing screen (alarms full screen, reminders as a sheet).
+   --------------------------------------------------------------------- */
+.kg-ring {
+  color: var(--ring-ice);
+  background:
+    radial-gradient(90% 55% at 50% 30%, var(--ring-glow), transparent 70%),
+    linear-gradient(180deg, var(--ring-top) 0%, var(--ring-mid) 45%, var(--ring-bottom) 100%);
+}
+.kg-ring-dim { color: var(--ring-ice-dim); }
+.kg-ring-card {
+  background: color-mix(in srgb, var(--ring-ice) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ring-ice) 24%, transparent);
+  box-shadow: 0 20px 40px -20px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(10px);
+}
+.kg-ring-pulse { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 70%, transparent); animation: kg-ring-pulse 1.6s infinite; }
+@keyframes kg-ring-pulse { 70% { box-shadow: 0 0 0 9px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+.kg-ring-nudge-up { animation: kg-nudge-up 1.8s ease-in-out infinite; }
+.kg-ring-nudge-down { animation: kg-nudge-down 1.8s ease-in-out infinite; }
+@keyframes kg-nudge-up { 50% { transform: translateY(-5px); } }
+@keyframes kg-nudge-down { 50% { transform: translateY(5px); } }
+.kg-ring-buzz { animation: kg-buzz 2.6s 1.2s infinite; }
+@keyframes kg-buzz {
+  0%, 9%, 100% { transform: none; }
+  1.5% { transform: translateX(-3px) rotate(-0.4deg); }
+  3% { transform: translateX(3px) rotate(0.4deg); }
+  4.5% { transform: translateX(-3px) rotate(-0.3deg); }
+  6% { transform: translateX(2px); }
+  7.5% { transform: translateX(-1px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .kg-ring-pulse, .kg-ring-nudge-up, .kg-ring-nudge-down, .kg-ring-buzz { animation: none; }
+}
+
+/* ---------------------------------------------------------------------
+   Home's story: a colour per screen, shapes drifting behind the number,
+   and a bar that fills while each screen is up.
+   --------------------------------------------------------------------- */
+.kg-story { color: #fff; }
+.kg-story-shape { position: absolute; background: rgba(255, 255, 255, 0.22); pointer-events: none; }
+.kg-story-float { animation: kg-story-float 6s ease-in-out infinite; }
+.kg-story-spin { animation: kg-story-spin 18s linear infinite; }
+@keyframes kg-story-float { 50% { transform: translateY(28px); } }
+@keyframes kg-story-spin { to { transform: rotate(360deg); } }
+.kg-story-fill { width: 0; animation: kg-story-fill var(--story-ms, 4500ms) linear forwards; }
+@keyframes kg-story-fill { to { width: 100%; } }
+@media (prefers-reduced-motion: reduce) {
+  .kg-story-float, .kg-story-spin { animation: none; }
+}
+
+/* ---------------------------------------------------------------------
+   Changing page (page-transition.tsx). The new page ripples out of the
+   touch and the old one has the same circle cut out of it. These rules
+   switch off the browser's own crossfade for the two pages and set up the
+   hole; the script places it under the finger and grows it. Black in a mask
+   is only "keep": masks read alpha, not colour.
+   --------------------------------------------------------------------- */
+/* Taps reach the page while it changes, so a quick second tap is never lost. */
+::view-transition { pointer-events: none; }
+/* The header, tab bar and assistant button hold still above the moving pages:
+   only their live picture shows, so the tab highlight still slides. */
+::view-transition-group(kg-header),
+::view-transition-group(kg-tabbar),
+::view-transition-group(kg-assistant) { animation: none; z-index: 100; }
+::view-transition-old(kg-header),
+::view-transition-old(kg-tabbar),
+::view-transition-old(kg-assistant) { display: none; }
+::view-transition-new(kg-header),
+::view-transition-new(kg-tabbar),
+::view-transition-new(kg-assistant) { animation: none; }
+::view-transition-new(.kg-page-in) { animation: none; }
+/* Two mask layers: the whole page kept, minus a circle (the second layer), which starts at nothing. */
+::view-transition-old(.kg-page-out) {
+  animation: none;
+  -webkit-mask-image: linear-gradient(#000 0 0), radial-gradient(closest-side, #000 calc(100% - 1px), transparent);
+  mask-image: linear-gradient(#000 0 0), radial-gradient(closest-side, #000 calc(100% - 1px), transparent);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  -webkit-mask-size: 100% 100%, 0 0;
+  mask-size: 100% 100%, 0 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }

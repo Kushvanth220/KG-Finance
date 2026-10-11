@@ -1,4 +1,5 @@
 import { ExpenseReminderProvider } from "@/components/notifications/expense-reminder-provider";
+import { AlarmRinger } from "@/components/alarm/alarm-ringer";
 import { BalanceCelebrationOverlay } from "@/components/balance/balance-celebration";
 import { LaunchSplash } from "@/components/brand/launch-splash";
 import { AppShell } from "@/components/layout/app-shell";
@@ -22,6 +23,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <SmoothScroll />
       <AppShell>
         <ExpenseReminderProvider />
+        <AlarmRinger />
         <BalanceCelebrationOverlay />
         <SyncBanner />
         <SyncReadyGate>

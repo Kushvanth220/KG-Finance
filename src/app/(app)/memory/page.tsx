@@ -6,7 +6,6 @@ import {
   Bell,
   CreditCard,
   Landmark,
-  ReceiptText,
   Sparkles,
   Tags,
   TrendingUp,
@@ -17,43 +16,50 @@ import {
   MemorySection,
   NewEntryRow,
 } from "@/components/memory/memory-section";
-import { BillEditor, type BillDraft } from "@/components/memory/bill-editor";
 import { ReminderEditor } from "@/components/memory/reminder-editor";
 import { useAssistantName, useAssistantPreferencesStore } from "@/store/assistant-preferences-store";
-import { describeSchedule, dueLabel, isDueSoon, type Reminder } from "@/lib/ai/reminders";
+import {
+  describeSchedule,
+  doneForThisCycle,
+  dueLabel,
+  isDueSoon,
+  nextDueDate,
+  ringLabel,
+  toIsoDate,
+  type Reminder,
+} from "@/lib/ai/reminders";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useFinanceStore } from "@/store/finance-store";
 import { formatCurrency } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import { MemoryPulse } from "@/components/art/page-art";
-import { BillCalendar } from "@/components/memory/bill-calendar";
+import { ReminderCalendar } from "@/components/memory/reminder-calendar";
 import { NotificationCard } from "@/components/memory/notification-card";
-import { CalendarDays, List } from "lucide-react";
-import { PERSON_LABELS, type MonthlyExpense } from "@/types";
+import { AlarmClock, CalendarDays, List } from "lucide-react";
+import { PERSON_LABELS } from "@/types";
 
 /**
  * The app's memory: everything the assistant knows, by category, all editable here.
  *
  * Two different stores feed this page. Reminders and behaviour rules live with
- * the assistant (Supabase, via /api/ai/preferences); bills, sources, categories
- * and debts live in the finance store on the device. The page hides that seam —
+ * the assistant (Supabase, via /api/ai/preferences); sources, categories and
+ * debts live in the finance store on the device. The page hides that seam —
  * from the user's side it is one mind — but saves have to route to the right
  * place, which is why the assistant sections carry their own saving state.
+ *
+ * There is no Bills section: anything due — rent, a card payment, a transfer —
+ * is a reminder.
  */
 
-const ordinal = (n: number) => {
-  const s = ["th", "st", "nd", "rd"];
-  const v = n % 100;
-  return `${n}${s[(v - 20) % 10] ?? s[v] ?? s[0]}`;
-};
+const SNOOZES = [
+  { days: 1, label: "1d", name: "for a day" },
+  { days: 3, label: "3d", name: "for 3 days" },
+  { days: 7, label: "1w", name: "for a week" },
+];
 
 export default function MemoryPage() {
   const assistantName = useAssistantName();
   const {
-    monthlyExpenses,
-    addMonthlyExpense,
-    updateMonthlyExpense,
-    deleteMonthlyExpense,
     incomeSources,
     addIncomeSource,
     updateIncomeSource,
@@ -106,21 +112,12 @@ export default function MemoryPage() {
     const iso = `${until.getFullYear()}-${String(until.getMonth() + 1).padStart(2, "0")}-${String(until.getDate()).padStart(2, "0")}`;
     updateStructuredReminder(id, { snoozedUntil: iso });
   };
-  const [reminderEditor, setReminderEditor] = useState<null | { reminder?: Reminder }>(null);
-  const [billEditor, setBillEditor] = useState<null | { bill?: MonthlyExpense }>(null);
+  const [reminderEditor, setReminderEditor] = useState<null | { reminder?: Reminder; alarm?: boolean }>(null);
   const [pendingDelete, setPendingDelete] = useState<null | {
     label: string;
     detail: string;
     run: () => void;
   }>(null);
-
-  const sortedBills = useMemo(
-    () =>
-      [...monthlyExpenses].sort(
-        (a, b) => (a.dueDayOfMonth ?? 99) - (b.dueDayOfMonth ?? 99) || a.name.localeCompare(b.name)
-      ),
-    [monthlyExpenses]
-  );
 
   const openDebts = debts.filter((debt) => debt.amount > 0);
 
@@ -174,7 +171,7 @@ export default function MemoryPage() {
       </div>
 
       {layout === "calendar" ? (
-        <BillCalendar bills={monthlyExpenses} reminders={structuredReminders} />
+        <ReminderCalendar reminders={structuredReminders} />
       ) : null}
 
       <NotificationCard />
@@ -214,6 +211,16 @@ export default function MemoryPage() {
         icon={<Bell className="w-3.5 h-3.5" />}
         addLabel="Add"
         onAdd={() => setReminderEditor({})}
+        extraAction={
+          <button
+            type="button"
+            onClick={() => setReminderEditor({ alarm: true })}
+            className="inline-flex items-center gap-1 rounded-lg bg-accent px-2 py-1 text-[11px] font-semibold text-white"
+          >
+            <AlarmClock className="h-3 w-3" />
+            Alarm
+          </button>
+        }
       >
         {orderedReminders.length === 0 ? (
           <MemoryEmpty>
@@ -222,6 +229,7 @@ export default function MemoryPage() {
         ) : (
           orderedReminders.map((reminder) => {
             const soon = isDueSoon(reminder);
+            const cycleDone = doneForThisCycle(reminder);
             return (
               <div key={reminder.id} className="flex items-start gap-2 px-4 py-2.5">
                 <div className="min-w-0 flex-1">
@@ -231,20 +239,35 @@ export default function MemoryPage() {
                       reminder.done && "text-muted line-through decoration-1"
                     )}
                   >
+                    {reminder.alarm ? (
+                      <AlarmClock className="mr-1 inline h-3.5 w-3.5 -translate-y-px text-accent" aria-label="Alarm" />
+                    ) : null}
                     {reminder.text}
+                    {reminder.amount ? (
+                      <span className="ml-1.5 font-semibold tabular-nums">{formatCurrency(reminder.amount)}</span>
+                    ) : null}
                   </p>
+                  {!reminder.done && (ringLabel(reminder) || reminder.paused) ? (
+                    <p className={cn("mt-0.5 text-[10.5px] font-medium", reminder.paused ? "text-muted" : "text-accent")}>
+                      {reminder.paused ? "Paused" : ringLabel(reminder)}
+                    </p>
+                  ) : null}
                   <div className="mt-1 flex flex-wrap items-center gap-1.5">
                     <button
                       type="button"
                       onClick={() => toggleReminderDone(reminder.id)}
                       className={cn(
                         "rounded-full px-1.5 py-0.5 text-[9.5px] font-semibold",
-                        reminder.done
+                        reminder.done || cycleDone
                           ? "bg-positive/15 text-positive"
                           : "bg-caution/15 text-caution"
                       )}
                     >
-                      {reminder.done ? "Done · reopen" : "Open · mark done"}
+                      {reminder.done
+                        ? "Done · reopen"
+                        : cycleDone
+                          ? `Done this time · ${dueLabel(reminder).replace(/^Due/, "next")}`
+                          : "Open · mark done"}
                     </button>
                     {!reminder.done && soon ? (
                       <span className="rounded-full bg-negative/15 px-1.5 py-0.5 text-[9.5px] font-semibold text-negative">
@@ -256,20 +279,49 @@ export default function MemoryPage() {
                         {dueLabel(reminder)}
                       </span>
                     ) : null}
-                    {!reminder.done ? (
+                    {!reminder.done && reminder.repeat !== "once" ? (
+                      <span className="inline-flex items-center gap-0.5 text-[9.5px] text-muted">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = nextDueDate(reminder);
+                            updateStructuredReminder(reminder.id, {
+                              skip: reminder.skip ? undefined : next ? toIsoDate(next) : undefined,
+                            });
+                          }}
+                          className="hit rounded px-1 font-semibold text-accent hover:bg-black/5 dark:hover:bg-white/10"
+                        >
+                          {reminder.skip ? `Unskip ${reminder.skip.slice(5).replace("-", "/")}` : "Skip next"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => updateStructuredReminder(reminder.id, { paused: reminder.paused ? undefined : true })}
+                          className="hit rounded px-1 font-semibold text-accent hover:bg-black/5 dark:hover:bg-white/10"
+                        >
+                          {reminder.paused ? "Resume" : "Pause"}
+                        </button>
+                      </span>
+                    ) : null}
+                    {!reminder.done && !cycleDone && !reminder.alarm ? (
                       <span className="inline-flex items-center gap-0.5 text-[9.5px] text-muted">
                         snooze
-                        <button type="button" onClick={() => snooze(reminder.id, 1)} className="hit rounded px-1 font-semibold text-accent hover:bg-black/5 dark:hover:bg-white/10">
-                          1d
-                        </button>
-                        <button type="button" onClick={() => snooze(reminder.id, 7)} className="hit rounded px-1 font-semibold text-accent hover:bg-black/5 dark:hover:bg-white/10">
-                          1w
-                        </button>
+                        {SNOOZES.map((option) => (
+                          <button
+                            key={option.days}
+                            type="button"
+                            onClick={() => snooze(reminder.id, option.days)}
+                            aria-label={`Snooze ${option.name}`}
+                            className="hit rounded px-1 font-semibold text-accent hover:bg-black/5 dark:hover:bg-white/10"
+                          >
+                            {option.label}
+                          </button>
+                        ))}
                       </span>
                     ) : null}
                     <span className="text-[10px] text-muted">
                       {describeSchedule(reminder)}
                       {reminder.leadDays > 0 ? ` · ${reminder.leadDays}d early` : ""}
+                      {reminder.person ? ` · ${PERSON_LABELS[reminder.person]}` : ""}
                     </span>
                   </div>
                 </div>
@@ -342,59 +394,6 @@ export default function MemoryPage() {
                 })
               }
             />
-          ))
-        )}
-      </MemorySection>
-
-      {/* ---- bills ---- */}
-      <MemorySection
-        title="Bills"
-        hint={`Recurring costs ${assistantName} can remind you about`}
-        count={monthlyExpenses.length}
-        tint="var(--danger)"
-        icon={<ReceiptText className="w-3.5 h-3.5" />}
-        addLabel="Add"
-        onAdd={() => setBillEditor({})}
-      >
-        {sortedBills.length === 0 ? (
-          <MemoryEmpty>
-            No bills tracked yet. Add rent, phone, or anything due each month.
-          </MemoryEmpty>
-        ) : (
-          sortedBills.map((bill) => (
-            <div key={bill.id} className="flex items-start gap-2 px-4 py-2.5">
-              <div className="min-w-0 flex-1">
-                <p className="text-[13px] font-medium leading-snug">{bill.name}</p>
-                <p className="text-[10px] text-muted mt-0.5">
-                  {bill.isVariable ? "Amount varies" : formatCurrency(bill.amount ?? 0)}
-                  {bill.dueDayOfMonth ? ` · due ${ordinal(bill.dueDayOfMonth)}` : ""}
-                  {bill.isRecurring ? " · every month" : " · one time"}
-                  {` · ${PERSON_LABELS[bill.person]}`}
-                </p>
-              </div>
-              <div className="flex shrink-0 items-center gap-0.5">
-                <button
-                  type="button"
-                  onClick={() => setBillEditor({ bill })}
-                  className="rounded-md p-1.5 text-[11px] text-accent hover:bg-black/5 dark:hover:bg-white/10"
-                >
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setPendingDelete({
-                      label: "Delete this bill?",
-                      detail: bill.name,
-                      run: () => deleteMonthlyExpense(bill.id),
-                    })
-                  }
-                  className="rounded-md p-1.5 text-[11px] text-negative hover:bg-black/5 dark:hover:bg-white/10"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
           ))
         )}
       </MemorySection>
@@ -551,6 +550,7 @@ export default function MemoryPage() {
         <ReminderEditor
           open
           initial={reminderEditor.reminder}
+          startAsAlarm={reminderEditor.alarm}
           onClose={() => setReminderEditor(null)}
           onSave={(draft) => {
             if (reminderEditor.reminder) {
@@ -559,19 +559,6 @@ export default function MemoryPage() {
               addStructuredReminder(draft);
             }
             setReminderEditor(null);
-          }}
-        />
-      ) : null}
-
-      {billEditor ? (
-        <BillEditor
-          open
-          initial={billEditor.bill}
-          onClose={() => setBillEditor(null)}
-          onSave={(draft: BillDraft) => {
-            if (billEditor.bill) updateMonthlyExpense(billEditor.bill.id, draft);
-            else addMonthlyExpense(draft);
-            setBillEditor(null);
           }}
         />
       ) : null}

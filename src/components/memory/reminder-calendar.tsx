@@ -2,23 +2,21 @@
 
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { getDueDateForExpense } from "@/lib/monthly-expense-tracker";
 import { nextDueDate, type Reminder } from "@/lib/ai/reminders";
 import { formatCurrency } from "@/lib/formatters";
-import type { MonthlyExpense } from "@/types";
 import { cn } from "@/lib/utils";
 
 /**
- * The month as a grid, bills and reminders as dots on their days.
+ * The month as a grid, reminders as dots on their days.
  *
  * A list says what is due; a calendar says how the month is shaped — the
  * heavy week, the quiet stretch, the two things landing on the same Friday.
+ * Reminders with an amount are payments, marked apart and totalled.
  */
 
 interface DayItem {
   key: string;
   name: string;
-  kind: "bill" | "reminder";
   amount: number | null;
 }
 
@@ -28,26 +26,16 @@ function key(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export function BillCalendar({ bills, reminders }: { bills: MonthlyExpense[]; reminders: Reminder[] }) {
+export function ReminderCalendar({ reminders }: { reminders: Reminder[] }) {
   const today = useMemo(() => new Date(), []);
   const [month, setMonth] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
   const [selected, setSelected] = useState<string>(key(today));
 
-  const { cells, byDay } = useMemo(() => {
+  const { cells, byDay, monthTotal } = useMemo(() => {
     const first = new Date(month.getFullYear(), month.getMonth(), 1);
     const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
     const byDay = new Map<string, DayItem[]>();
-    const push = (d: Date, item: DayItem) => {
-      const k = key(d);
-      byDay.set(k, [...(byDay.get(k) ?? []), item]);
-    };
-
-    for (const bill of bills) {
-      const due = getDueDateForExpense(bill, first);
-      if (!due || due.getMonth() !== month.getMonth() || due.getFullYear() !== month.getFullYear()) continue;
-      if (!bill.isRecurring && bill.isPaid) continue;
-      push(due, { key: `b-${bill.id}`, name: bill.name, kind: "bill", amount: bill.amount });
-    }
+    let monthTotal = 0;
 
     // A reminder lands on a day if, asked from that day, it is due that day.
     for (let day = 1; day <= daysInMonth; day++) {
@@ -55,9 +43,13 @@ export function BillCalendar({ bills, reminders }: { bills: MonthlyExpense[]; re
       for (const reminder of reminders) {
         if (reminder.done) continue;
         const due = nextDueDate(reminder, date);
-        if (due && key(due) === key(date)) {
-          push(date, { key: `r-${reminder.id}-${day}`, name: reminder.text, kind: "reminder", amount: null });
-        }
+        if (!due || key(due) !== key(date)) continue;
+        const k = key(date);
+        byDay.set(k, [
+          ...(byDay.get(k) ?? []),
+          { key: `r-${reminder.id}-${day}`, name: reminder.text, amount: reminder.amount ?? null },
+        ]);
+        monthTotal += reminder.amount ?? 0;
       }
     }
 
@@ -66,8 +58,8 @@ export function BillCalendar({ bills, reminders }: { bills: MonthlyExpense[]; re
     for (let i = 0; i < lead; i++) cells.push(null);
     for (let day = 1; day <= daysInMonth; day++) cells.push(new Date(month.getFullYear(), month.getMonth(), day));
     while (cells.length % 7 !== 0) cells.push(null);
-    return { cells, byDay };
-  }, [bills, reminders, month]);
+    return { cells, byDay, monthTotal };
+  }, [reminders, month]);
 
   const selectedItems = byDay.get(selected) ?? [];
   const monthLabel = month.toLocaleDateString("en-US", { month: "long", year: "numeric" });
@@ -83,7 +75,12 @@ export function BillCalendar({ bills, reminders }: { bills: MonthlyExpense[]; re
         >
           <ChevronLeft className="h-4 w-4" />
         </button>
-        <p className="text-xs font-semibold">{monthLabel}</p>
+        <div className="text-center">
+          <p className="text-xs font-semibold">{monthLabel}</p>
+          {monthTotal > 0 ? (
+            <p className="text-[10px] text-muted tabular-nums">{formatCurrency(monthTotal)} due</p>
+          ) : null}
+        </div>
         <button
           type="button"
           onClick={() => setMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))}
@@ -125,7 +122,7 @@ export function BillCalendar({ bills, reminders }: { bills: MonthlyExpense[]; re
                     key={item.key}
                     className={cn(
                       "h-1.5 w-1.5 rounded-full",
-                      isSelected ? "bg-white" : item.kind === "bill" ? "bg-caution" : "bg-feature"
+                      isSelected ? "bg-white" : item.amount ? "bg-caution" : "bg-feature"
                     )}
                   />
                 ))}
@@ -142,7 +139,7 @@ export function BillCalendar({ bills, reminders }: { bills: MonthlyExpense[]; re
           <div className="space-y-1">
             {selectedItems.map((item) => (
               <div key={item.key} className="flex items-center gap-2 text-[12px]">
-                <span className={cn("h-2 w-2 shrink-0 rounded-full", item.kind === "bill" ? "bg-caution" : "bg-feature")} />
+                <span className={cn("h-2 w-2 shrink-0 rounded-full", item.amount ? "bg-caution" : "bg-feature")} />
                 <span className="min-w-0 flex-1 truncate">{item.name}</span>
                 {item.amount !== null ? (
                   <span className="shrink-0 font-semibold tabular-nums">{formatCurrency(item.amount)}</span>

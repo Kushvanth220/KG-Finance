@@ -42,6 +42,8 @@ export function Reveal({
   const still = useReducedMotion();
   const ref = useRef<HTMLDivElement>(null);
   const [shown, setShown] = useState(false);
+  // Arrived with a page move that is already dealing this card in: show it without a second entrance.
+  const [dealt, setDealt] = useState(false);
 
   useEffect(() => {
     const node = ref.current;
@@ -53,6 +55,7 @@ export function Reveal({
         observer = new IntersectionObserver(
           ([entry]) => {
             if (!entry?.isIntersecting) return;
+            if (node.hasAttribute("data-dealt")) setDealt(true);
             setShown(true);
             observer?.disconnect();
           },
@@ -80,7 +83,7 @@ export function Reveal({
       variants={cardEnter}
       initial="hidden"
       animate={shown ? "shown" : "hidden"}
-      transition={{ duration: DURATION.slow, ease: EASE, delay }}
+      transition={dealt ? { duration: 0 } : { duration: DURATION.slow, ease: EASE, delay }}
     >
       {children}
     </motion.div>

@@ -21,6 +21,7 @@ export function MemorySection({
   icon,
   addLabel,
   onAdd,
+  extraAction,
   children,
 }: {
   title: string;
@@ -30,6 +31,8 @@ export function MemorySection({
   icon: ReactNode;
   addLabel?: string;
   onAdd?: () => void;
+  /** A second button beside Add, e.g. "Alarm" on Reminders. */
+  extraAction?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -51,17 +54,20 @@ export function MemorySection({
           </div>
           <p className="text-[11px] text-muted mt-0.5">{hint}</p>
         </div>
-        {onAdd ? (
-          <button
-            type="button"
-            onClick={onAdd}
-            className="shrink-0 inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold text-white"
-            style={{ background: tint }}
-          >
-            <Plus className="w-3 h-3" />
-            {addLabel ?? "Add"}
-          </button>
-        ) : null}
+        <div className="flex shrink-0 items-center gap-1.5">
+          {extraAction}
+          {onAdd ? (
+            <button
+              type="button"
+              onClick={onAdd}
+              className="shrink-0 inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold text-white"
+              style={{ background: tint }}
+            >
+              <Plus className="w-3 h-3" />
+              {addLabel ?? "Add"}
+            </button>
+          ) : null}
+        </div>
       </div>
       <div className="divide-y divide-black/5 dark:divide-white/[0.07]">{children}</div>
     </GlassCard>

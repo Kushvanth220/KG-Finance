@@ -1,5 +1,11 @@
 import type { AssistantToolCall } from "@/lib/ai/tools";
-import { describeSchedule, DEFAULT_LEAD_DAYS, type Reminder } from "@/lib/ai/reminders";
+import {
+  describeSchedule,
+  formatReminderAmount,
+  parseRepeat,
+  reminderDraftFromArgs,
+  type Reminder,
+} from "@/lib/ai/reminders";
 import { parseAiUserId } from "@/lib/ai/person";
 import { PERSON_LABELS } from "@/types";
 
@@ -218,16 +224,6 @@ export function sortAccountChips<T extends { name: string }>(chips: T[]): T[] {
   return [...chips].sort((a, b) => rank(a.name) - rank(b.name) || a.name.localeCompare(b.name));
 }
 
-function numberOr(value: unknown, fallback: number): number {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : fallback;
-}
-
-function normalizeRepeat(value: unknown): Reminder["repeat"] {
-  const raw = String(value ?? "").toLowerCase();
-  return raw === "weekly" || raw === "monthly" || raw === "yearly" ? raw : "once";
-}
-
 function ordinalDay(value: unknown): string {
   const n = Number(value);
   if (!Number.isFinite(n)) return String(value);
@@ -341,23 +337,33 @@ export function buildToolConfirmationPreview(call: AssistantToolCall): string {
     case "save_reminder": {
       const preview: Reminder = {
         id: "preview",
-        text: String(args.reminder ?? "this"),
-        done: false,
-        repeat: normalizeRepeat(args.repeat),
-        leadDays: numberOr(args.lead_days, DEFAULT_LEAD_DAYS),
-        ...(args.date ? { date: String(args.date) } : {}),
-        ...(args.day_of_month != null ? { dayOfMonth: Number(args.day_of_month) } : {}),
-        ...(args.month != null ? { month: Number(args.month) } : {}),
-        ...(args.weekday != null ? { weekday: Number(args.weekday) } : {}),
-        ...(args.time ? { time: String(args.time) } : {}),
+        ...reminderDraftFromArgs(args, String(args.reminder ?? "this")),
       };
+      const amount = preview.amount != null ? ` (${formatReminderAmount(preview.amount)})` : "";
       const lead = preview.leadDays > 0 ? `, raised ${preview.leadDays} days early` : "";
-      return `Remember "${preview.text}" — ${describeSchedule(preview)}${lead}.`;
+      if (preview.alarm) {
+        return `Set an alarm "${preview.text}"${amount} — ${describeSchedule(preview)}. It rings full screen until you swipe it.`;
+      }
+      return `Remember "${preview.text}"${amount} — ${describeSchedule(preview)}${lead}.`;
     }
     case "update_reminder": {
       const changes: string[] = [];
       if (args.new_text) changes.push(`text to "${String(args.new_text)}"`);
-      if (args.repeat) changes.push(`repeat to ${String(args.repeat)}`);
+      if (args.repeat) changes.push(`repeat to ${parseRepeat(args.repeat) === "biweekly" ? "every 2 weeks" : String(args.repeat)}`);
+      if (args.amount != null) {
+        changes.push(Number(args.amount) > 0 ? `amount to ${moneyLabel(args.amount)}` : "remove the amount");
+      }
+      if (args.until) {
+        changes.push(/^none$/i.test(String(args.until)) ? "no end date" : `end date to ${String(args.until)}`);
+      }
+      if (typeof args.alarm === "boolean") changes.push(args.alarm ? "make it an alarm" : "make it a plain reminder");
+      if (Array.isArray(args.times)) changes.push(`times to ${(args.times as unknown[]).map(String).join(" and ")}`);
+      if (Array.isArray(args.weekdays)) changes.push(`days to ${(args.weekdays as unknown[]).map((d) => weekdayName(d)).join(", ")}`);
+      if (args.count != null) changes.push(Number(args.count) > 0 ? `end after ${Number(args.count)} times` : "no count limit");
+      if (args.snooze_minutes != null) changes.push(`snooze to ${Number(args.snooze_minutes)} min`);
+      if (args.lead_minutes != null) changes.push(Number(args.lead_minutes) > 0 ? `a heads-up ${Number(args.lead_minutes)} min before` : "no heads-up");
+      if (typeof args.paused === "boolean") changes.push(args.paused ? "pause it" : "resume it");
+      if (typeof args.note === "string") changes.push(args.note.trim() ? `note "${args.note.trim()}"` : "remove the note");
       if (args.day_of_month != null) changes.push(`day to the ${ordinalDay(args.day_of_month)}`);
       if (args.weekday != null) changes.push(`day to ${weekdayName(args.weekday)}`);
       if (args.month != null) changes.push(`month to ${monthName(args.month)}`);

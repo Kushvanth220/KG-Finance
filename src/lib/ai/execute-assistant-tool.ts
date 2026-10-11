@@ -4,13 +4,15 @@ import { format } from "date-fns";
 import { getAccountsForPerson } from "@/lib/accounts";
 import { roundMoney, splitMoney } from "@/lib/money";
 import {
-  DEFAULT_LEAD_DAYS,
   describeSchedule,
   dueLabel,
   daysUntilDue,
+  formatReminderAmount,
   isDueSoon,
+  parseRepeat,
+  reminderDraftFromArgs,
   renderReminderLine,
-  type ReminderRepeat,
+  toIsoDate,
 } from "@/lib/ai/reminders";
 import { parseAiUserId } from "@/lib/ai/person";
 import {
@@ -965,37 +967,13 @@ export function executeAssistantTool(
         const extras = [when, timezone ? `tz:${timezone}` : ""].filter(Boolean).join(" · ");
         const text = extras ? `${reminder} (${extras})` : reminder;
 
-        const asNumber = (value: unknown, min: number, max: number) => {
-          const n = Number(value);
-          return Number.isFinite(n) && n >= min && n <= max ? n : undefined;
-        };
-        const rawRepeat = String(args.repeat ?? "").toLowerCase().trim();
-        const repeat: ReminderRepeat =
-          rawRepeat === "weekly" || rawRepeat === "monthly" || rawRepeat === "yearly"
-            ? rawRepeat
-            : "once";
-        const time = /^\d{1,2}:\d{2}$/.test(String(args.time ?? "").trim())
-          ? String(args.time).trim()
-          : undefined;
-        const date = /^\d{4}-\d{2}-\d{2}$/.test(String(args.date ?? "").trim())
-          ? String(args.date).trim()
-          : undefined;
-
         const reminderPerson = parseAiUserId(args.person) ?? undefined;
-        useAssistantPreferencesStore.getState().addStructuredReminder({
+        const draft = {
+          ...reminderDraftFromArgs(args, text),
           ...(reminderPerson ? { person: reminderPerson } : {}),
-          text,
-          done: false,
-          repeat,
-          leadDays: asNumber(args.lead_days, 0, 60) ?? DEFAULT_LEAD_DAYS,
-          ...(repeat === "once" && date ? { date } : {}),
-          ...(repeat === "weekly" ? { weekday: asNumber(args.weekday, 0, 6) } : {}),
-          ...(repeat === "monthly" || repeat === "yearly"
-            ? { dayOfMonth: asNumber(args.day_of_month, 1, 31) }
-            : {}),
-          ...(repeat === "yearly" ? { month: asNumber(args.month, 1, 12) } : {}),
-          ...(time ? { time } : {}),
-        });
+        };
+        useAssistantPreferencesStore.getState().addStructuredReminder(draft);
+        const amount = draft.amount != null ? ` (${formatReminderAmount(draft.amount)})` : "";
         return {
           id: call.id,
           name: call.name,
@@ -1004,19 +982,9 @@ export function executeAssistantTool(
             saved: true,
             // Read back the schedule too, so a mis-heard cycle is caught now
             // rather than the day a bill is missed.
-            message: `Saved. I'll remember: "${text.slice(0, 140)}" — ${describeSchedule({
+            message: `Saved. I'll remember: "${text.slice(0, 140)}"${amount} — ${describeSchedule({
               id: "new",
-              text,
-              done: false,
-              repeat,
-              leadDays: asNumber(args.lead_days, 0, 60) ?? DEFAULT_LEAD_DAYS,
-              ...(repeat === "once" && date ? { date } : {}),
-              ...(repeat === "weekly" ? { weekday: asNumber(args.weekday, 0, 6) } : {}),
-              ...(repeat === "monthly" || repeat === "yearly"
-                ? { dayOfMonth: asNumber(args.day_of_month, 1, 31) }
-                : {}),
-              ...(repeat === "yearly" ? { month: asNumber(args.month, 1, 12) } : {}),
-              ...(time ? { time } : {}),
+              ...draft,
             })}`,
           },
         };
@@ -1058,11 +1026,9 @@ export function executeAssistantTool(
           const n = Number(value);
           return Number.isFinite(n) && n >= min && n <= max ? n : undefined;
         };
-        const rawRepeat = String(args.repeat ?? "").toLowerCase().trim();
-        const repeat: ReminderRepeat | undefined =
-          rawRepeat === "once" || rawRepeat === "weekly" || rawRepeat === "monthly" || rawRepeat === "yearly"
-            ? rawRepeat
-            : undefined;
+        const repeat = parseRepeat(args.repeat);
+        const amount = args.amount != null ? Number(args.amount) : undefined;
+        const until = String(args.until ?? "").trim();
 
         const updates: Partial<typeof target> = {
           ...(args.new_text ? { text: String(args.new_text).trim() } : {}),
@@ -1073,7 +1039,38 @@ export function executeAssistantTool(
           ...(/^\d{4}-\d{2}-\d{2}$/.test(String(args.date ?? "")) ? { date: String(args.date) } : {}),
           ...(/^\d{1,2}:\d{2}$/.test(String(args.time ?? "")) ? { time: String(args.time) } : {}),
           ...(args.lead_days != null ? { leadDays: asNumber(args.lead_days, 0, 60) ?? target.leadDays } : {}),
+          ...(amount != null && Number.isFinite(amount)
+            ? { amount: amount > 0 ? Math.round(amount * 100) / 100 : undefined }
+            : {}),
+          ...(/^\d{4}-\d{2}-\d{2}$/.test(until) ? { until } : /^none$/i.test(until) ? { until: undefined } : {}),
+          ...(typeof args.alarm === "boolean" ? { alarm: args.alarm || undefined } : {}),
+          ...(Array.isArray(args.times)
+            ? (() => {
+                const list = [...new Set((args.times as unknown[]).map(String).filter((t) => /^\d{1,2}:\d{2}$/.test(t)))].sort();
+                return { time: list[0], times: list.length > 1 ? list : undefined };
+              })()
+            : {}),
+          ...(Array.isArray(args.weekdays)
+            ? { weekdays: [...new Set((args.weekdays as unknown[]).map(Number).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6))] }
+            : {}),
+          ...(args.nth != null ? { nth: asNumber(args.nth, -1, 4) || undefined } : {}),
+          ...(args.every != null ? { every: asNumber(args.every, 1, 365) } : {}),
+          ...(["day", "week", "month", "year"].includes(String(args.unit)) ? { unit: String(args.unit) as "day" | "week" | "month" | "year" } : {}),
+          ...(args.count != null ? { count: asNumber(args.count, 1, 999) } : {}),
+          ...(args.lead_minutes != null ? { leadMinutes: asNumber(args.lead_minutes, 1, 1440) } : {}),
+          ...(args.snooze_minutes != null ? { snoozeMinutes: asNumber(args.snooze_minutes, 1, 120) } : {}),
+          ...(typeof args.paused === "boolean" ? { paused: args.paused || undefined } : {}),
+          ...(typeof args.note === "string" ? { note: args.note.trim().slice(0, 300) || undefined } : {}),
+          // A different cycle makes the old "done through" meaningless.
+          ...(repeat && repeat !== target.repeat ? { doneThrough: undefined } : {}),
         };
+        // An alarm rings at a time; one switched on without any rings at nine.
+        if (updates.alarm && !updates.time && !target.time) updates.time = "09:00";
+        // Counting "10 times" needs a first day to count from.
+        if (updates.count && !updates.date && !target.date) updates.date = toIsoDate(new Date());
+        // Every other week counts from a first day; moving onto it without
+        // one would leave it never due, so start from today.
+        if (repeat === "biweekly" && !updates.date && !target.date) updates.date = toIsoDate(new Date());
 
         store.updateStructuredReminder(target.id, updates);
         const after = { ...target, ...updates };

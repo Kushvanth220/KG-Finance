@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { AiUserId } from "@/lib/ai/person";
+import { reminderFromLegacyLine, renderReminderLine, type Reminder } from "@/lib/ai/reminders";
 
 export interface AiChatSession {
   id: string;
@@ -235,8 +236,40 @@ export interface AssistantPreferencesRow {
   wake_listening_enabled: boolean;
   language: string;
   behavior_instructions: string[];
+  /** The sentences the assistant reads, one per reminder. */
   reminders: string[];
+  /**
+   * The same reminders as data. Stored rows used to hold only sentences; those
+   * are read back through `reminderFromLegacyLine`, so both shapes load.
+   */
+  reminder_data: Reminder[];
   updated_at: string;
+}
+
+/**
+ * One stored reminder. The column is JSONB: newer rows keep each reminder as
+ * its data plus the sentence, older rows as the sentence alone.
+ */
+function readStoredReminders(value: unknown): { lines: string[]; data: Reminder[] } {
+  const items = Array.isArray(value) ? value : [];
+  const lines: string[] = [];
+  const data: Reminder[] = [];
+  items.forEach((item, index) => {
+    if (typeof item === "string") {
+      lines.push(item);
+      data.push(reminderFromLegacyLine(item, `legacy-${index}-${item.slice(0, 12)}`));
+    } else if (item && typeof item === "object" && typeof (item as Reminder).text === "string") {
+      const { line, ...reminder } = item as Reminder & { line?: string };
+      data.push(reminder);
+      lines.push(typeof line === "string" ? line : renderReminderLine(reminder));
+    }
+  });
+  return { lines, data };
+}
+
+/** What goes into the column: each reminder's data, with its sentence alongside. */
+export function storedReminders(data: Reminder[]): Array<Reminder & { line: string }> {
+  return data.map((reminder) => ({ ...reminder, line: renderReminderLine(reminder) }));
 }
 
 /**
@@ -268,6 +301,7 @@ export async function fetchAssistantPreferences(
   if (!data) return null;
 
   const row = data as Record<string, unknown>;
+  const stored = readStoredReminders(row.reminders);
   return {
     workspace_id: String(row.workspace_id),
     assistant_name: row.assistant_name ? String(row.assistant_name) : null,
@@ -277,15 +311,17 @@ export async function fetchAssistantPreferences(
     behavior_instructions: Array.isArray(row.behavior_instructions)
       ? (row.behavior_instructions as string[])
       : [],
-    reminders: Array.isArray(row.reminders) ? (row.reminders as string[]) : [],
+    reminders: stored.lines,
+    reminder_data: stored.data,
     updated_at: String(row.updated_at ?? new Date().toISOString()),
   };
 }
 
 export async function upsertAssistantPreferences(
-  payload: Partial<Omit<AssistantPreferencesRow, "workspace_id" | "updated_at">> & {
+  payload: Partial<Omit<AssistantPreferencesRow, "workspace_id" | "updated_at" | "reminders" | "reminder_data">> & {
     behavior_instructions?: string[];
-    reminders?: string[];
+    /** Sentences (old clients) or data with sentences (`storedReminders`). */
+    reminders?: string[] | Array<Reminder & { line: string }>;
   },
   workspaceId = getWorkspaceId()
 ) {
@@ -308,7 +344,9 @@ export async function upsertAssistantPreferences(
     if (isMissingTableError(error)) return null;
     throw new Error(error.message);
   }
-  return data as AssistantPreferencesRow;
+  const row = data as Record<string, unknown>;
+  const stored = readStoredReminders(row.reminders);
+  return { ...(row as unknown as AssistantPreferencesRow), reminders: stored.lines, reminder_data: stored.data };
 }
 
 /**
@@ -427,6 +465,55 @@ export async function upsertWorkspaceRules(
     throw new Error(error.message);
   }
   return { workspace_id: workspaceId, data: payload, updated_at: String(data.updated_at) };
+}
+
+/**
+ * Change one reminder on the server — what a Done or Snooze tapped on a
+ * notification does while the app is closed. The change is stamped as newest,
+ * so the next time a device syncs, `newerReminder` keeps it over the device's
+ * older copy. Null when the reminder isn't there (or the row still holds only
+ * sentences, before any device has synced reminders as data).
+ */
+export async function updateStoredReminder(
+  id: string,
+  change: (reminder: Reminder) => Reminder,
+  workspaceId = getWorkspaceId()
+): Promise<Reminder | null> {
+  const prefs = await fetchAssistantPreferences(workspaceId);
+  if (!prefs) return null;
+  const index = prefs.reminder_data.findIndex((item) => item.id === id);
+  if (index < 0) return null;
+  const list = [...prefs.reminder_data];
+  const updated = { ...change(list[index]!), updatedAt: new Date().toISOString() };
+  list[index] = updated;
+  await upsertAssistantPreferences({ reminders: storedReminders(list) }, workspaceId);
+  return updated;
+}
+
+/* ------------------------------------------------------------------ */
+/* Push log: each ring is sent once                                     */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Claim one send by its key (reminder, kind, minute). True the first time,
+ * false when another run already sent it, null when the `push_log` table
+ * isn't there — then the caller falls back to a narrow time window instead.
+ */
+export async function claimPush(key: string, workspaceId = getWorkspaceId()): Promise<boolean | null> {
+  const supabase = getServerSupabase();
+  const { error } = await supabase.from("push_log").insert({ key, workspace_id: workspaceId });
+  if (!error) return true;
+  if (isMissingTableError(error)) return null;
+  if (error.code === "23505") return false;
+  throw new Error(error.message);
+}
+
+/** Old claims only take up room: a ring is never re-sent days later. */
+export async function prunePushLog(olderThanDays = 3): Promise<void> {
+  const supabase = getServerSupabase();
+  const cutoff = new Date(Date.now() - olderThanDays * 86_400_000).toISOString();
+  const { error } = await supabase.from("push_log").delete().lt("sent_at", cutoff);
+  if (error && !isMissingTableError(error)) throw new Error(error.message);
 }
 
 /* ------------------------------------------------------------------ */

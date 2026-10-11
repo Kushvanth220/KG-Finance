@@ -6,11 +6,15 @@ import { v4 as uuidv4 } from "uuid";
 import type { AssistantVoiceGender } from "@/lib/ai/assistant-voice";
 import {
   DEFAULT_LEAD_DAYS,
+  DEFAULT_SNOOZE_MINUTES,
+  doneForThisCycle,
   dueLabel,
+  newerReminder,
   nextDueDate,
   reminderFromLegacyLine,
   renderReminderLine,
   toIsoDate,
+  toStamp,
   type Reminder,
 } from "@/lib/ai/reminders";
 import { ASSISTANT_LANGUAGE } from "@/lib/ai/live-config";
@@ -48,8 +52,11 @@ interface AssistantPreferencesState {
   updateStructuredReminder: (id: string, updates: Partial<Reminder>) => void;
   deleteStructuredReminder: (id: string) => void;
   toggleReminderDone: (id: string) => void;
+  /** An alarm or pop-up handled: done for this ring, or snoozed for its snooze length. */
+  handleRing: (id: string, outcome: "done" | "snooze", now?: Date) => void;
   setBehaviorInstructions: (instructions: string[]) => void;
   setReminders: (reminders: string[]) => void;
+  setReminderData: (reminders: Reminder[]) => void;
   hydrateFromServer: () => Promise<void>;
   syncToServer: () => Promise<void>;
   getAssistantName: () => string;
@@ -187,17 +194,64 @@ export const useAssistantPreferencesStore = create<AssistantPreferencesState>()(
       },
 
       addStructuredReminder: (reminder) => {
-        const next = [...get().structuredReminders, { ...reminder, id: uuidv4() }];
+        const next = [
+          ...get().structuredReminders,
+          { ...reminder, id: uuidv4(), updatedAt: new Date().toISOString() },
+        ];
         set({ structuredReminders: next, reminders: next.map(renderReminderLine) });
         void get().syncToServer();
       },
 
       updateStructuredReminder: (id, updates) => {
         const next = get().structuredReminders.map((item) =>
-          item.id === id ? { ...item, ...updates } : item
+          item.id === id ? { ...item, ...updates, updatedAt: new Date().toISOString() } : item
         );
         set({ structuredReminders: next, reminders: next.map(renderReminderLine) });
         void get().syncToServer();
+      },
+
+      handleRing: (id, outcome, now = new Date()) => {
+        const target = get().structuredReminders.find((item) => item.id === id);
+        if (!target) return;
+        if (outcome === "snooze") {
+          const minutes = target.snoozeMinutes ?? DEFAULT_SNOOZE_MINUTES;
+          get().updateStructuredReminder(id, {
+            snoozedUntil: toStamp(new Date(now.getTime() + minutes * 60_000)),
+          });
+          return;
+        }
+        // Done covers this ring and anything before it. A one-off is finished;
+        // a repeating one waits for its next ring — later today, if it has one.
+        if (target.repeat === "once") {
+          get().updateStructuredReminder(id, { done: true, snoozedUntil: undefined });
+          return;
+        }
+        get().updateStructuredReminder(id, { doneThrough: toStamp(now), snoozedUntil: undefined });
+      },
+
+      /**
+       * Adopt the server's reminders as data. Each one this device also holds
+       * is settled by `newerReminder`, so a Done tapped on a notification (made
+       * on the server) lands here, and an edit made here is not undone by an
+       * older copy. Ones it doesn't hold came from the other phone.
+       */
+      setReminderData: (incoming) => {
+        const local = get().structuredReminders;
+        const byId = new Map(local.map((item) => [item.id, item]));
+        let changed = false;
+        const next = local.map((mine) => {
+          const theirs = incoming.find((item) => item.id === mine.id);
+          if (!theirs) return mine;
+          const merged = newerReminder(mine, theirs);
+          if (merged !== mine) changed = true;
+          return merged;
+        });
+        for (const theirs of incoming) {
+          if (byId.has(theirs.id)) continue;
+          next.push(theirs);
+          changed = true;
+        }
+        if (changed) set({ structuredReminders: next, reminders: next.map(renderReminderLine) });
       },
 
       deleteStructuredReminder: (id) => {
@@ -209,6 +263,18 @@ export const useAssistantPreferencesStore = create<AssistantPreferencesState>()(
       toggleReminderDone: (id) => {
         const target = get().structuredReminders.find((item) => item.id === id);
         if (!target) return;
+        // As in markReminderDone: a recurring reminder is done for this cycle
+        // only, and the tap again undoes that. Closing it outright (an old
+        // `done` from before) is still reopened by the same tap.
+        if (target.repeat !== "once" && !target.done) {
+          if (doneForThisCycle(target)) {
+            get().updateStructuredReminder(id, { doneThrough: undefined });
+            return;
+          }
+          const due = nextDueDate(target);
+          get().updateStructuredReminder(id, { doneThrough: toIsoDate(due ?? new Date()) });
+          return;
+        }
         get().updateStructuredReminder(id, { done: !target.done });
       },
 
@@ -229,18 +295,25 @@ export const useAssistantPreferencesStore = create<AssistantPreferencesState>()(
           value.replace(/^\[DONE\]\s*/i, "").trim().toLowerCase();
         const known = existing.map((item) => core(item.text));
 
-        // A snooze is the one field that may travel onto a reminder this
-        // device already holds: it is a small, dated, self-expiring fact, and
-        // "not now" decided on one phone should hold on the other.
-        const snoozeByText = new Map<string, string | undefined>();
+        // A snooze, and a cycle marked done, are the fields that may travel
+        // onto a reminder this device already holds: small, dated,
+        // self-expiring facts. "Not now" or "rent's paid" decided on one phone
+        // should hold on the other. Done only ever moves forward.
+        const incomingByText = new Map<string, { snoozedUntil?: string; doneThrough?: string }>();
         for (const line of reminders) {
           const parsed = reminderFromLegacyLine(line, "probe");
-          snoozeByText.set(core(parsed.text), parsed.snoozedUntil);
+          incomingByText.set(core(parsed.text), parsed);
         }
         const withSnooze = existing.map((item) => {
-          const incoming = snoozeByText.get(core(item.text));
-          if (incoming === undefined || incoming === item.snoozedUntil) return item;
-          return { ...item, snoozedUntil: incoming };
+          const incoming = incomingByText.get(core(item.text));
+          if (!incoming) return item;
+          const snoozedUntil = incoming.snoozedUntil ?? item.snoozedUntil;
+          const doneThrough =
+            incoming.doneThrough && (!item.doneThrough || incoming.doneThrough > item.doneThrough)
+              ? incoming.doneThrough
+              : item.doneThrough;
+          if (snoozedUntil === item.snoozedUntil && doneThrough === item.doneThrough) return item;
+          return { ...item, snoozedUntil, doneThrough };
         });
         if (withSnooze.some((item, i) => item !== existing[i])) {
           set({ structuredReminders: withSnooze, reminders: withSnooze.map(renderReminderLine) });
@@ -279,6 +352,7 @@ export const useAssistantPreferencesStore = create<AssistantPreferencesState>()(
             wake_listening_enabled?: boolean;
             behavior_instructions?: string[];
             reminders?: string[];
+            reminder_data?: Reminder[];
           };
 
           set((state) => ({
@@ -294,25 +368,36 @@ export const useAssistantPreferencesStore = create<AssistantPreferencesState>()(
             namingCompleted: state.namingCompleted || Boolean(prefs.assistant_name),
           }));
 
-          // Reminders go through setReminders so anything the assistant saved
-          // on another device is adopted as structured rather than overwriting
-          // the schedules already set here.
-          if (Array.isArray(prefs.reminders)) {
+          // A server that already keeps reminders as data hands them over by
+          // id. One still holding only sentences (ids it made up while
+          // reading them, "legacy-…") goes through setReminders, which
+          // matches on text so the schedules set here are not overwritten.
+          const data = Array.isArray(prefs.reminder_data) ? prefs.reminder_data : [];
+          const remoteIsLegacy = data.some((item) => item.id.startsWith("legacy-"));
+          if (data.length > 0 && !remoteIsLegacy) {
+            get().setReminderData(data);
+          } else if (Array.isArray(prefs.reminders)) {
             get().setReminders(prefs.reminders);
           }
 
-          // Push back when our derived lines differ from the server's. Without
-          // this a device that migrated but never edited left the server on the
-          // old strings, so the other phone kept reading stale reminders.
+          // Push back when the server is behind: still on sentences, missing
+          // one of ours, holding an older copy, or reading differently.
           // Derive fresh from the structured source rather than trusting the
           // persisted `reminders` array. A stale copy here is what pushed a
           // re-rendered (and therefore longer) line back to the server on every
           // load, growing "— remind 5 days before" one suffix at a time.
-          const derived = get().structuredReminders.map(renderReminderLine);
+          const local = get().structuredReminders;
+          const derived = local.map(renderReminderLine);
           const remote = prefs.reminders ?? [];
+          const remoteById = new Map(data.map((item) => [item.id, item]));
           const drifted =
+            remoteIsLegacy ||
             derived.length !== remote.length ||
-            derived.some((line, index) => line !== remote[index]);
+            derived.some((line, index) => line !== remote[index]) ||
+            local.some((item) => {
+              const theirs = remoteById.get(item.id);
+              return !theirs || (item.updatedAt ?? "") > (theirs.updatedAt ?? "");
+            });
           if (drifted) void get().syncToServer();
         } catch {
           // Supabase table may not exist yet — local prefs still work.
@@ -332,6 +417,7 @@ export const useAssistantPreferencesStore = create<AssistantPreferencesState>()(
               language: state.language,
               behavior_instructions: state.behaviorInstructions,
               reminders: state.reminders,
+              reminder_data: state.structuredReminders,
             }),
           });
         } catch {

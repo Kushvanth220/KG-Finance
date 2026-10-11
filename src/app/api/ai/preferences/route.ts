@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import {
   fetchAssistantPreferences,
+  storedReminders,
   upsertAssistantPreferences,
 } from "@/lib/ai/chat-store";
+import { newerReminder, reminderFromLegacyLine, type Reminder } from "@/lib/ai/reminders";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +14,10 @@ interface PreferencesBody {
   wake_listening_enabled?: boolean;
   language?: string;
   behavior_instructions?: string[];
+  /** Sentences only: what clients sent before reminders travelled as data. */
   reminders?: string[];
+  /** Reminders as data. When present, this is the list. */
+  reminder_data?: Reminder[];
   append_behavior_instruction?: string;
   append_reminder?: string;
 }
@@ -27,6 +32,12 @@ export async function GET() {
   }
 }
 
+const isReminder = (value: unknown): value is Reminder =>
+  !!value &&
+  typeof value === "object" &&
+  typeof (value as Reminder).id === "string" &&
+  typeof (value as Reminder).text === "string";
+
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as PreferencesBody;
@@ -40,12 +51,30 @@ export async function POST(request: Request) {
       }
     }
 
-    let reminders = body.reminders ?? existing?.reminders ?? [];
-    if (body.append_reminder?.trim()) {
-      const line = body.append_reminder.trim().slice(0, 500);
-      if (!reminders.includes(line)) {
-        reminders = [...reminders, line];
+    let reminders: Parameters<typeof upsertAssistantPreferences>[0]["reminders"];
+    if (Array.isArray(body.reminder_data)) {
+      // The device sends its whole list. Per reminder, a copy changed here
+      // more recently (a Done or Snooze tapped on a notification) beats the
+      // device's older one, and "done through" never moves back.
+      const saved = new Map((existing?.reminder_data ?? []).map((item) => [item.id, item]));
+      let list = body.reminder_data.filter(isReminder).map((incoming) => {
+        const { line: _line, ...clean } = incoming as Reminder & { line?: string };
+        void _line;
+        const old = saved.get(clean.id);
+        return old ? newerReminder(clean, old) : clean;
+      });
+      if (body.append_reminder?.trim()) {
+        const line = body.append_reminder.trim().slice(0, 500);
+        list = [...list, reminderFromLegacyLine(line, crypto.randomUUID())];
       }
+      reminders = storedReminders(list);
+    } else {
+      let lines = body.reminders ?? existing?.reminders ?? [];
+      if (body.append_reminder?.trim()) {
+        const line = body.append_reminder.trim().slice(0, 500);
+        if (!lines.includes(line)) lines = [...lines, line];
+      }
+      reminders = lines;
     }
 
     const saved = await upsertAssistantPreferences({
