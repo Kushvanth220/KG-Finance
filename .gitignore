@@ -32,6 +32,8 @@ yarn-error.log*
 
 # env files (never commit secrets)
 .env*
+# SQL with secrets filled in, for pasting into Supabase (never commit)
+supabase/*.local.sql
 !.env.local.example
 
 # local data exports (sensitive — keep on disk, never commit)

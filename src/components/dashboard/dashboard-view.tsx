@@ -436,24 +436,22 @@ export function DashboardView() {
         />
       </Reveal>
 
-      {/* The deck: one card in front, swipe for the next. */}
+      {/* The story stands on its own, first: the month at a glance before any detail. A new
+          person, range or set of screens (data arriving after the first paint) starts it again
+          from its first screen. */}
       <Reveal {...section(2)}>
+        <MoneyStory
+          key={`${person}-${range.label}-${story.map((s) => s.id).join(".")}`}
+          slides={story}
+          title={range.short}
+          narrator={assistantName}
+        />
+      </Reveal>
+
+      {/* The deck of everything else: one card in front, swipe for the next. */}
+      <Reveal {...section(3)}>
         <HomeDeck
           cards={[
-            {
-              id: "story",
-              label: "Story",
-              // A new person, range or set of screens (data arriving after the first paint)
-              // starts the story again from its first screen.
-              node: (
-                <MoneyStory
-                  key={`${person}-${range.label}-${story.map((s) => s.id).join(".")}`}
-                  slides={story}
-                  title={range.short}
-                  narrator={assistantName}
-                />
-              ),
-            },
             // Flex is Kushvanth's: G's tab never shows it.
             ...(person === "kushvanth" && hasFlex ? [{ id: "flex", label: "Flex", node: <FlexWeekCard /> }] : []),
             { id: "income", label: "Income", node: (

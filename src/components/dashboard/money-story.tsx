@@ -117,7 +117,7 @@ export function MoneyStory({
     setStep((s) => ({ index: (to + count) % count, prev: Math.min(s.index, count - 1), dir, run: s.run + 1 }));
   };
 
-  // A tap moves; a hold pauses; a drag belongs to the deck around this card.
+  // A tap moves; a hold pauses; a drag (scrolling the page past the card) does neither.
   const tap = (dir: number) => {
     const p = press.current;
     press.current = null;
