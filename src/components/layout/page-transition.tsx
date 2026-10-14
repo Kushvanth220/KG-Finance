@@ -1,6 +1,6 @@
 "use client";
 
-import { ViewTransition, useEffect, type ReactNode } from "react";
+import { ViewTransition, useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { useReducedMotion } from "motion/react";
 
@@ -14,9 +14,10 @@ import { useReducedMotion } from "motion/react";
  * A page opened without a touch (the back button, a redirect) ripples up from
  * the tab bar.
  *
- * It runs on the browser's view transitions: React names the old and the new
- * page, the browser keeps a picture of the old one, and the two pictures are
- * animated here by name. Both pages are see-through over the shared
+ * In Chrome it runs on the browser's view transitions: React names the old and
+ * the new page, the browser keeps a picture of the old one, and the two
+ * pictures are animated here by name. Everywhere else, including every iPhone
+ * browser, the live page does the same move by itself (see picturesWork). Both pages are see-through over the shared
  * background, so the circle is the only boundary. Inside it is the new page;
  * outside it, the old page with the same circle cut out of it. The new picture
  * is live, so the cards being dealt show through it. The ripple waits for the
@@ -38,6 +39,8 @@ const RIPPLE_EASE = `cubic-bezier(${CURVE.join(", ")})`;
 const FRESH_MS = 4000;
 // The most cards dealt on one page; the rest arrive with the ripple.
 const MAX_CARDS = 10;
+// The longest the ripple waits for a new page to settle before starting anyway.
+const SETTLE_MS = 150;
 
 // Where the last touch landed, and where the page was at that moment.
 let touch = { x: 0, y: 0, at: Number.NEGATIVE_INFINITY, pageX: 0, pageY: 0 };
@@ -122,10 +125,13 @@ function cardsOf(page: HTMLElement): HTMLElement[] {
  * the move. So short cards get the full turn and long lists barely any.
  */
 function turnFor(box: DOMRect): number {
-  const room = Math.max(0, Math.min(box.left, window.innerWidth - box.right) - 1);
+  const room = roomBeside(box);
   const most = (Math.asin(Math.min(1, (2 * room) / Math.max(1, box.height))) * 180) / Math.PI;
   return Math.min(2.5, most);
 }
+
+/** Space between a card and the nearer edge of the screen. */
+const roomBeside = (box: DOMRect) => Math.max(0, Math.min(box.left, window.innerWidth - box.right) - 1);
 
 const unmark = (card: HTMLElement) => card.removeAttribute("data-dealt");
 
@@ -136,10 +142,14 @@ function deal(cards: HTMLElement[], x: number, y: number, reach: number) {
     const dx = Math.max(box.left - x, 0, x - box.right);
     const dy = Math.max(box.top - y, 0, y - box.bottom);
     const reached = timeToReach(Math.hypot(dx, dy) / reach) * RIPPLE_MS;
+    // The bounce overshoots, so a card growing back to full size passes it for a moment. One
+    // that already spans the screen would poke past the edge (and zoom a phone out), so it
+    // keeps its size and only rises.
+    const grows = roomBeside(box) >= 4;
     const dealt = card.animate(
       [
-        { translate: "0 44px", rotate: `${(i % 2 ? 1 : -1) * turnFor(box)}deg`, scale: "0.95", opacity: 0 },
-        { translate: "0 0", rotate: "0deg", scale: "1", opacity: 1 },
+        { translate: "0 44px", rotate: `${(i % 2 ? 1 : -1) * turnFor(box)}deg`, ...(grows ? { scale: "0.95" } : {}), opacity: 0 },
+        { translate: "0 0", rotate: "0deg", ...(grows ? { scale: "1" } : {}), opacity: 1 },
       ],
       {
         duration: DEAL_MS,
@@ -160,18 +170,19 @@ let waiting: (() => void)[] = [];
 /**
  * Run once the new page has drawn two quiet frames. A page does most of its
  * setting up in its first frames; a ripple started then would stall and jump
- * ahead. Gives up waiting after a dozen frames.
+ * ahead. Never waits longer than SETTLE_MS: a slow phone would otherwise sit on
+ * a frozen screen.
  */
 function whenSettled(run: () => void) {
   waiting.push(run);
   if (waiting.length > 1) return;
-  let last = performance.now();
+  const began = performance.now();
+  let last = began;
   let calm = 0;
-  let frames = 0;
   const tick = (now: number) => {
     calm = now - last < 34 ? calm + 1 : 0;
     last = now;
-    if (calm < 2 && ++frames < 12) {
+    if (calm < 2 && performance.now() - began < SETTLE_MS) {
       requestAnimationFrame(tick);
       return;
     }
@@ -244,13 +255,61 @@ function rippleOut(name: string) {
   };
 }
 
+/**
+ * The same move without pictures, on the live page: it grows out of the touch
+ * over the shared background while its cards are dealt in. The old page is
+ * simply gone. Used where the picture version is not dependable.
+ */
+function rippleLive(page: HTMLElement) {
+  const { x, y } = origin();
+  const reach = reachFrom(x, y);
+  const box = page.getBoundingClientRect();
+  const at = `${x - box.left}px ${y - box.top}px`;
+  const ripple = page.animate(
+    [{ clipPath: `circle(0px at ${at})` }, { clipPath: `circle(${reach}px at ${at})` }],
+    { duration: RIPPLE_MS, easing: RIPPLE_EASE, fill: "backwards" }
+  );
+  const cards = cardsOf(page);
+  cards.forEach((card) => (card.dataset.dealt = ""));
+  deal(cards, x, y, reach);
+  return () => ripple.cancel();
+}
+
 // A view-transition name for a route: "/" is kg-page-home, "/flex" kg-page-flex.
 const pageName = (pathname: string) =>
   `kg-page-${pathname.split("/").filter(Boolean).join("_").replace(/[^\w-]/g, "") || "home"}`;
 
+/**
+ * Whether this browser gets the picture version. Only Chrome and its
+ * relatives (desktop and Android), where it was built and checked. WebKit,
+ * which every iPhone browser runs, drew the old page's picture at the wrong
+ * size and left it on screen, and could hold the move for seconds; it gets
+ * the live version instead.
+ */
+const picturesWork = () =>
+  typeof document.startViewTransition === "function" &&
+  /Chrome\//.test(navigator.userAgent) &&
+  !/iPhone|iPad|iPod/.test(navigator.userAgent);
+
 export function PageTransition({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const still = useReducedMotion();
+  // Decided on the first render, never after, so nothing remounts. The server renders the
+  // picture version and Chrome hydrates it as is; other browsers drop the <ViewTransition>
+  // straight away, because React starts a view transition whenever one is put in, even
+  // one that animates nothing. The page's own HTML is the same either way.
+  const pictures = typeof window === "undefined" || (picturesWork() && !still);
+
+  // Without pictures, the move runs on the live page once it is in. The first page arrives as is.
+  const shownPath = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    if (shownPath.current === pathname) return;
+    const first = shownPath.current === null;
+    shownPath.current = pathname;
+    if (first || pictures || still) return;
+    const page = pageNode();
+    return page ? rippleLive(page) : undefined;
+  }, [pathname, pictures, still]);
 
   // Remember every touch (and Enter or Space on a focused control): the next page grows from it.
   useEffect(() => {
@@ -270,7 +329,7 @@ export function PageTransition({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  if (still) return <div data-kg-page="">{children}</div>;
+  if (!pictures) return <div key={pathname} data-kg-page="">{children}</div>;
 
   return (
     <ViewTransition

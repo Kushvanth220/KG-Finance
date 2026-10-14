@@ -13,6 +13,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // <main> rises once, when the app opens. Changing page is PageTransition's
   // job; <main> used to be keyed on the route, which rebuilt everything in it
   // (the alarm, the sync banner, the page move itself) on every tap.
+  //
+  // It clips sideways at the screen's edge: on a phone, anything poking past it
+  // (a card mid-animation, a too-wide row) zooms the whole page out for a
+  // moment and cancels a page move. `clip`, unlike `hidden`, makes no scroll
+  // box, so sticky and fixed things inside behave as before.
   return (
     <AssistantProvider>
       <FlexIncomeBridge />
@@ -29,7 +34,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </header>
 
       <main
-        className="kg-rise flex-1 max-w-6xl w-full mx-auto px-4 py-6 pb-[calc(6.75rem+env(safe-area-inset-bottom))] md:pb-8"
+        className="kg-rise flex-1 max-w-6xl w-full mx-auto overflow-x-clip px-4 py-6 pb-[calc(6.75rem+env(safe-area-inset-bottom))] md:pb-8"
       >
         {children}
       </main>

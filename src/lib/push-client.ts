@@ -11,6 +11,7 @@ import type { Person } from "@/types";
  */
 
 export type PushStatus =
+  | "insecure"
   | "unsupported"
   | "no-key"
   | "denied"
@@ -36,7 +37,14 @@ export function pushSupported(): boolean {
   );
 }
 
+/**
+ * Opened over plain http from another device (the computer's Wi-Fi address):
+ * browsers allow notifications only on https or on localhost itself.
+ */
+const insecure = () => typeof window !== "undefined" && !window.isSecureContext;
+
 export async function getPushStatus(): Promise<PushStatus> {
+  if (insecure()) return "insecure";
   if (!pushSupported()) return "unsupported";
   if (!PUBLIC_KEY) return "no-key";
   if (Notification.permission === "denied") return "denied";
@@ -47,6 +55,7 @@ export async function getPushStatus(): Promise<PushStatus> {
 
 /** Ask, subscribe, and tell the server. Resolves to the resulting status. */
 export async function enablePush(person: Person): Promise<PushStatus> {
+  if (insecure()) return "insecure";
   if (!pushSupported()) return "unsupported";
   if (!PUBLIC_KEY) return "no-key";
 

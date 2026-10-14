@@ -52,18 +52,16 @@ export function NotificationCard() {
     }
   };
 
-  const line =
-    status === "loading"
-      ? "Checking…"
-      : status === "unsupported"
-        ? "This browser can't receive notifications. On iPhone, add the app to the Home Screen first."
-        : status === "no-key"
-          ? "Not set up on the server yet (VAPID keys missing)."
-          : status === "denied"
-            ? "Blocked in browser settings. Allow notifications for this site to turn them on."
-            : status === "subscribed"
-              ? "On for this device. A nudge arrives each morning when something is due."
-              : "Off. Turn on to get a morning nudge for due bills and reminders.";
+  const line = {
+    loading: "Checking…",
+    insecure:
+      "Not on this address. Phones only allow notifications from the secure (https) site, so open the live app, add it to the Home Screen, and turn them on there.",
+    unsupported: "This browser can't receive notifications. On iPhone, add the app to the Home Screen first.",
+    "no-key": "Not set up on the server yet (VAPID keys missing).",
+    denied: "Blocked in browser settings. Allow notifications for this site to turn them on.",
+    subscribed: "On for this device. Alarms and reminders arrive here even with the app closed, plus a morning nudge.",
+    prompt: "Off. Turn on to get alarms, reminders and a morning nudge on this device.",
+  }[status];
 
   return (
     <div className="glass rounded-xl p-3">

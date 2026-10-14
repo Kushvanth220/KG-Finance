@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Image from "next/image";
 import { motion, useMotionValue, useReducedMotion, useTransform } from "motion/react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, Volume2 } from "lucide-react";
 import {
   DEFAULT_SNOOZE_MINUTES,
   formatReminderAmount,
@@ -11,7 +11,7 @@ import {
   toStamp,
   type Reminder,
 } from "@/lib/ai/reminders";
-import { playOnce, startAlarm } from "@/lib/alarm-sound";
+import { playOnce, soundLocked, startAlarm, subscribeSound } from "@/lib/alarm-sound";
 import { PERSON_LABELS } from "@/types";
 
 /**
@@ -49,6 +49,9 @@ export function RingScreen({
   const downLight = useTransform(y, [0, 20, 120], [0.6, 0.75, 1]);
   const cardScale = useTransform(y, [-300, 0, 300], [0.94, 1, 0.94]);
   const cardRef = useRef<HTMLDivElement>(null);
+  // An alarm found on opening the app rings before anyone has touched the page, and browsers
+  // hold sound back until a touch: say so, rather than ringing in silence.
+  const locked = useSyncExternalStore(subscribeSound, soundLocked, () => false);
 
   // Sound and vibration for as long as it is on screen.
   useEffect(() => {
@@ -172,6 +175,11 @@ export function RingScreen({
             {clock}
             <span className="kg-ring-dim ml-1 text-[18px] font-medium tracking-normal">{meridiem}</span>
           </p>
+          {locked && reminder.sound !== "silent" ? (
+            <p className="kg-ring-card mt-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-mono text-[10.5px] uppercase tracking-[0.14em]">
+              <Volume2 className="h-3.5 w-3.5" aria-hidden /> Tap anywhere for sound
+            </p>
+          ) : null}
           {hints(card)}
         </div>
       </motion.div>
