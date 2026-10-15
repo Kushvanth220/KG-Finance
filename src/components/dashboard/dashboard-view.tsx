@@ -25,7 +25,9 @@ import {
   sumPersonExpenses,
 } from "@/lib/calculations";
 import { NeedsYou } from "@/components/dashboard/needs-you";
-import { HomeDeck } from "@/components/dashboard/home-deck";
+import { HomeDeck, type DeckCard } from "@/components/dashboard/home-deck";
+import { HomeCardsEditor, useHomeCards } from "@/components/dashboard/home-cards-editor";
+import { arrangeCards, type HomeCardId } from "@/lib/home-cards";
 import { MoneyStory } from "@/components/dashboard/money-story";
 import { FlexWeekCard } from "@/components/dashboard/flex-week-card";
 import { buildMoneyStory, storyPeriod, storyWindow } from "@/lib/money-story";
@@ -147,6 +149,9 @@ export function DashboardView() {
   const [person, setPerson] = useState<Person>("kushvanth");
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
   const [incomeOpen, setIncomeOpen] = useState(false);
+  // The deck's layout (order, hidden cards) for this browser, and its editor.
+  const [cardPrefs, setCardPrefs] = useHomeCards();
+  const [editingCards, setEditingCards] = useState(false);
   const [unusedOpen, setUnusedOpen] = useState(false);
   // How each panel is drawn — a viewing preference kept per browser.
   const [incomeChart, setIncomeChart] = useChartType("income", "donut");
@@ -184,6 +189,17 @@ export function DashboardView() {
       getAccountsForPerson(accounts, person).some((a) => a.type === "credit" && a.balance > 0)
     );
   }, [debts, accounts, person]);
+
+  // The deck's cards this person has, and the deck laid out the way this browser keeps it.
+  const availableCards: HomeCardId[] = [
+    ...(person === "kushvanth" && hasFlex ? (["flex"] as const) : []),
+    "income",
+    "spending",
+    "accounts",
+    ...(hasDebts ? (["debts"] as const) : []),
+  ];
+  const laidOut = (cards: DeckCard[]) =>
+    arrangeCards(availableCards, cardPrefs).flatMap((id) => cards.filter((card) => card.id === id));
 
   const sourceNames = useMemo(
     () => Object.fromEntries(incomeSources.map((source) => [source.id, source.name])),
@@ -468,7 +484,8 @@ export function DashboardView() {
       {/* The deck of everything else: one card in front, swipe for the next. */}
       <Reveal {...section(3)}>
         <HomeDeck
-          cards={[
+          onEdit={() => setEditingCards(true)}
+          cards={laidOut([
             // Flex is Kushvanth's: G's tab never shows it.
             ...(person === "kushvanth" && hasFlex ? [{ id: "flex", label: "Flex", node: <FlexWeekCard /> }] : []),
             { id: "income", label: "Income", node: (
@@ -673,7 +690,7 @@ export function DashboardView() {
             // Reads the same store the Accounts page writes to, so the two agree.
             { id: "accounts", label: "Accounts", node: <AccountBalances person={person} /> },
             ...(hasDebts ? [{ id: "debts", label: "Debts", node: <DebtsSummary person={person} /> }] : []),
-          ]}
+          ])}
         />
       </Reveal>
 
@@ -697,6 +714,14 @@ export function DashboardView() {
       />
 
       {incomeOpen ? <AddIncomeSheet person={person} onClose={() => setIncomeOpen(false)} /> : null}
+
+      <HomeCardsEditor
+        open={editingCards}
+        onClose={() => setEditingCards(false)}
+        available={availableCards}
+        prefs={cardPrefs}
+        onChange={setCardPrefs}
+      />
     </motion.div>
   );
 }

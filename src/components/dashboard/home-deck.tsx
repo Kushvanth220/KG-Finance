@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FreshPresence } from "@/components/ui/fresh-presence";
 
@@ -25,7 +26,27 @@ export interface DeckCard {
 const SWIPE_DISTANCE = 70;
 const SWIPE_SPEED = 450;
 
-export function HomeDeck({ cards }: { cards: DeckCard[] }) {
+function EditButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Edit the cards"
+      className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[10.5px] font-semibold text-accent hover:bg-black/5 dark:hover:bg-white/10"
+    >
+      <Pencil className="h-3 w-3" aria-hidden /> Edit
+    </button>
+  );
+}
+
+export function HomeDeck({
+  cards,
+  onEdit,
+}: {
+  cards: DeckCard[];
+  /** Opens the layout editor; an Edit button sits above the deck. */
+  onEdit?: () => void;
+}) {
   const still = useReducedMotion();
   const [state, setState] = useState({ index: 0, dir: 1 });
 
@@ -39,7 +60,15 @@ export function HomeDeck({ cards }: { cards: DeckCard[] }) {
     setState({ index: (next + count) % count, dir });
   };
 
-  if (!card) return null;
+  // Every card switched off: say so, and keep the way back.
+  if (!card) {
+    return onEdit ? (
+      <div className="glass flex items-center justify-between gap-2 rounded-xl px-3 py-2.5">
+        <span className="text-xs text-muted">Every card is hidden.</span>
+        <EditButton onClick={onEdit} />
+      </div>
+    ) : null;
+  }
 
   return (
     <div
@@ -54,6 +83,13 @@ export function HomeDeck({ cards }: { cards: DeckCard[] }) {
         if (event.key === "ArrowLeft") go(index - 1, -1);
       }}
     >
+      {/* Above the deck, clear of the floating buttons that cover the bottom of the screen. */}
+      {onEdit ? (
+        <div className="mb-2 flex items-center justify-between px-1">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Your cards</p>
+          <EditButton onClick={onEdit} />
+        </div>
+      ) : null}
       <div className="relative">
         {/* The cards waiting behind: only their bottom edges peek out, like a stack. */}
         {count > 2 ? (
@@ -96,32 +132,38 @@ export function HomeDeck({ cards }: { cards: DeckCard[] }) {
       </div>
 
       {count > 1 ? (
-        <div className="mt-5 flex gap-1 overflow-x-auto px-0.5 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="tablist" aria-label="Choose a card">
-          {cards.map((item, i) => {
-            const active = i === index;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => go(i, i >= index ? 1 : -1)}
-                className={cn(
-                  "relative shrink-0 rounded-full px-2.5 py-1 text-[10.5px] font-semibold transition-colors",
-                  active ? "text-white" : "text-muted hover:text-foreground"
-                )}
-              >
-                {active ? (
-                  <motion.span
-                    layoutId="home-deck-tab"
-                    className="absolute inset-0 rounded-full bg-accent"
-                    transition={still ? { duration: 0 } : { type: "spring", stiffness: 400, damping: 32 }}
-                  />
-                ) : null}
-                <span className="relative">{item.label}</span>
-              </button>
-            );
-          })}
+        <div className="mt-5 flex items-center gap-1">
+          <div
+            className="flex min-w-0 flex-1 gap-1 overflow-x-auto px-0.5 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            role="tablist"
+            aria-label="Choose a card"
+          >
+            {cards.map((item, i) => {
+              const active = i === index;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => go(i, i >= index ? 1 : -1)}
+                  className={cn(
+                    "relative shrink-0 rounded-full px-2.5 py-1 text-[10.5px] font-semibold transition-colors",
+                    active ? "text-white" : "text-muted hover:text-foreground"
+                  )}
+                >
+                  {active ? (
+                    <motion.span
+                      layoutId="home-deck-tab"
+                      className="absolute inset-0 rounded-full bg-accent"
+                      transition={still ? { duration: 0 } : { type: "spring", stiffness: 400, damping: 32 }}
+                    />
+                  ) : null}
+                  <span className="relative">{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       ) : null}
     </div>
