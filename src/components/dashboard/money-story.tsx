@@ -64,7 +64,7 @@ function Screen({ slide, at, enter }: { slide: StorySlide; at: number; enter: bo
       <motion.p
         className={cn(
           "relative font-bold leading-none tracking-[-0.035em] tabular-nums",
-          slide.big.length > 7 ? "text-[44px]" : "text-[60px]"
+          slide.big.length > 7 || slide.list?.length ? "text-[44px]" : "text-[60px]"
         )}
         {...rise(0.35)}
       >
@@ -73,9 +73,29 @@ function Screen({ slide, at, enter }: { slide: StorySlide; at: number; enter: bo
       <motion.p className="relative text-sm font-medium text-white/90" {...rise(0.5)}>
         {slide.label}
       </motion.p>
-      <motion.p className="relative max-w-[30ch] text-[15px] leading-snug" {...rise(0.65)}>
-        {slide.say}
-      </motion.p>
+      {slide.list?.length ? (
+        // One row each, rising in turn, with when it is due on the right.
+        <ul className="relative mt-1 w-full max-w-[19rem] space-y-1.5 text-left">
+          {slide.list.map((item, i) => (
+            <motion.li
+              key={`${item.text}-${i}`}
+              className="flex items-center justify-between gap-3 rounded-xl bg-white/15 px-3 py-1.5"
+              {...rise(0.6 + i * 0.12)}
+            >
+              <span className="min-w-0 truncate text-[13.5px] font-semibold">{item.text}</span>
+              <span className="shrink-0 text-[11.5px] text-white/80 tabular-nums">{item.when}</span>
+            </motion.li>
+          ))}
+        </ul>
+      ) : null}
+      {slide.say ? (
+        <motion.p
+          className={cn("relative max-w-[30ch] leading-snug", slide.list?.length ? "text-[12.5px] text-white/85" : "text-[15px]")}
+          {...rise(slide.list?.length ? 0.6 + slide.list.length * 0.12 : 0.65)}
+        >
+          {slide.say}
+        </motion.p>
+      ) : null}
     </div>
   );
 }

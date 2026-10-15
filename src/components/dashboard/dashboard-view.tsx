@@ -29,6 +29,7 @@ import { HomeDeck } from "@/components/dashboard/home-deck";
 import { MoneyStory } from "@/components/dashboard/money-story";
 import { FlexWeekCard } from "@/components/dashboard/flex-week-card";
 import { buildMoneyStory, storyPeriod, storyWindow } from "@/lib/money-story";
+import { daysUntilDue, formatTime, ringTimes } from "@/lib/ai/reminders";
 import { useRulesStore } from "@/store/rules-store";
 import { findFlexRule } from "@/lib/flex";
 import { motion, useReducedMotion } from "motion/react";
@@ -300,7 +301,23 @@ export function DashboardView() {
   }, [transactions, person]);
 
   /**
-   * The story at the front of the deck. While the range is still running it is
+   * The story's first screen: this person's reminders and alarms (and the
+   * shared ones) due in the next 7 days, soonest first, with their time.
+   */
+  const storyReminders = useMemo(() => {
+    const now = new Date();
+    return reminders
+      .filter((r) => !r.done && !r.paused && (!r.person || r.person === person))
+      .map((r) => {
+        const at = ringTimes(r)[0];
+        return { text: r.text, daysUntil: daysUntilDue(r, now), at: at ?? "99:99", time: at ? formatTime(at) : null, amount: r.amount ?? null };
+      })
+      .filter((r): r is typeof r & { daysUntil: number } => r.daysUntil !== null && r.daysUntil >= 0 && r.daysUntil <= 7)
+      .sort((a, b) => a.daysUntil - b.daysUntil || a.at.localeCompare(b.at));
+  }, [reminders, person]);
+
+  /**
+   * The story at the top of Home. While the range is still running it is
    * measured against the same stretch of the period before, not all of it.
    */
   const story = useMemo(() => {
@@ -323,9 +340,9 @@ export function DashboardView() {
         now: sumPersonExpenses(transactions, person, range.start, span.nowEnd),
         then: sumPersonExpenses(transactions, person, range.prevStart, span.prevCut),
       },
-      due: dueThisWeek,
+      reminders: storyReminders,
     });
-  }, [range, rangeChoice.preset, transactions, person, spendCategories, incomeTotal, spendTotal, spentCategories, dueThisWeek]);
+  }, [range, rangeChoice.preset, transactions, person, spendCategories, incomeTotal, spendTotal, spentCategories, storyReminders]);
 
   const budgeted = useMemo(() => spendCategories.filter((c) => (c.budget ?? 0) > 0), [spendCategories]);
 

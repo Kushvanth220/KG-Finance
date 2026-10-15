@@ -18,31 +18,76 @@ const base: MoneyStoryInput = {
     { name: "Eating out", amount: 322 },
   ],
   pace: { now: 1240, then: 1454 },
-  due: [{ name: "Phone bill", amount: 64.99, daysUntil: 4 }],
+  reminders: [{ text: "Phone bill", daysUntil: 4, time: null, amount: 64.99 }],
   now: NOW,
 };
 
 describe("buildMoneyStory", () => {
-  it("tells kept, share, mover, pace and due in order", () => {
+  it("opens with the reminders, then tells kept, share, mover and pace", () => {
     const slides = buildMoneyStory(base);
-    expect(slides.map((s) => s.id)).toEqual(["kept", "share", "mover", "pace", "due"]);
-    expect(slides[0]).toMatchObject({ big: "$640", label: "kept in October", say: "That's 14% of the $4,560 that came in." });
-    expect(slides[1]).toMatchObject({ big: "66%", label: "of spending went to Rent", say: "More than everything else put together." });
-    expect(slides[2]).toMatchObject({
+    expect(slides.map((s) => s.id)).toEqual(["reminders", "kept", "share", "mover", "pace"]);
+    expect(slides[0]).toMatchObject({
+      big: "1",
+      label: "reminder this week",
+      list: [{ text: "Phone bill · $64.99", when: "Thu" }],
+      say: "",
+    });
+    expect(slides[1]).toMatchObject({ big: "$640", label: "kept in October", say: "That's 14% of the $4,560 that came in." });
+    expect(slides[2]).toMatchObject({ big: "66%", label: "of spending went to Rent", say: "More than everything else put together." });
+    expect(slides[3]).toMatchObject({
       big: "+$84",
       label: "Groceries vs this time in September",
       say: "Up from $436. Eating out fell $62.",
     });
-    expect(slides[3]).toMatchObject({
+    expect(slides[4]).toMatchObject({
       big: "−$214",
       label: "under September's pace",
       say: "$1,240 so far, against $1,454 by now in September.",
     });
-    expect(slides[4]).toMatchObject({ big: "$64.99", label: "Phone bill on Thursday", say: "The only thing due in the next 7 days." });
+  });
+
+  it("counts today's reminders and lists them first, then what is coming", () => {
+    const [first] = buildMoneyStory({
+      ...base,
+      reminders: [
+        { text: "Gym", daysUntil: 0, time: "6:30 AM" },
+        { text: "DD", daysUntil: 0 },
+        { text: "Car Wash", daysUntil: 2 },
+      ],
+    });
+    expect(first).toMatchObject({
+      big: "2",
+      label: "reminders today",
+      list: [
+        { text: "Gym", when: "6:30 AM" },
+        { text: "DD", when: "Today" },
+        { text: "Car Wash", when: "Tue" },
+      ],
+      say: "",
+    });
+  });
+
+  it("lists three and counts the rest", () => {
+    const [first] = buildMoneyStory({
+      ...base,
+      reminders: [
+        { text: "Rent", daysUntil: 1, time: "9:00 AM" },
+        { text: "Gym Sub", daysUntil: 2 },
+        { text: "Mobile Bill", daysUntil: 3 },
+        { text: "Car Bill", daysUntil: 5 },
+        { text: "India", daysUntil: 6 },
+      ],
+    });
+    expect(first.list).toEqual([
+      { text: "Rent", when: "Tomorrow 9:00 AM" },
+      { text: "Gym Sub", when: "Tue" },
+      { text: "Mobile Bill", when: "Wed" },
+    ]);
+    expect(first).toMatchObject({ big: "5", label: "reminders this week", say: "And 2 more this week." });
   });
 
   it("says overspent when more went out than came in", () => {
-    const [kept] = buildMoneyStory({ ...base, incomeTotal: 3780, spendTotal: 3994 });
+    const kept = buildMoneyStory({ ...base, incomeTotal: 3780, spendTotal: 3994 }).find((s) => s.id === "kept");
     expect(kept).toMatchObject({ big: "$214", label: "overspent in October", palette: "red" });
   });
 
@@ -60,10 +105,10 @@ describe("buildMoneyStory", () => {
 
   it("leaves out what it cannot compare", () => {
     const slides = buildMoneyStory({ ...base, prevCategories: [], pace: { now: 900, then: 0 } });
-    expect(slides.map((s) => s.id)).toEqual(["kept", "share", "due"]);
+    expect(slides.map((s) => s.id)).toEqual(["reminders", "kept", "share"]);
   });
 
-  it("still tells a quiet period, and that nothing is due", () => {
+  it("still tells a quiet period, and that there is nothing to remember", () => {
     const slides = buildMoneyStory({
       ...base,
       incomeTotal: 0,
@@ -71,17 +116,12 @@ describe("buildMoneyStory", () => {
       categories: [],
       prevCategories: [],
       pace: { now: 0, then: 0 },
-      due: [],
+      reminders: [],
     });
-    expect(slides.map((s) => [s.id, s.big])).toEqual([
-      ["quiet", "$0"],
-      ["due", "$0"],
+    expect(slides.map((s) => [s.id, s.big, s.say])).toEqual([
+      ["reminders", "0", "Nothing to remember this week."],
+      ["quiet", "$0", "Nothing recorded for these days yet."],
     ]);
-  });
-
-  it("uses the day when a reminder has no amount", () => {
-    const due = buildMoneyStory({ ...base, due: [{ name: "Call the bank", amount: null, daysUntil: 1 }, { name: "Rent", amount: 1500, daysUntil: 5 }] }).at(-1);
-    expect(due).toMatchObject({ big: "Tomorrow", label: "Call the bank", say: "The first of 2 things due in the next 7 days." });
   });
 
   it("compares whole periods once the range is over", () => {
@@ -94,7 +134,7 @@ describe("buildMoneyStory", () => {
     const stories = [
       buildMoneyStory(base),
       buildMoneyStory({ ...base, incomeTotal: 0 }),
-      buildMoneyStory({ ...base, due: [] }),
+      buildMoneyStory({ ...base, reminders: [] }),
       buildMoneyStory({ ...base, incomeTotal: 3920, prevCategories: [] }),
     ];
     for (const slides of stories) {

@@ -4,21 +4,36 @@ import { formatCurrency } from "@/lib/formatters";
 /**
  * Home's story: the period told as a few full screens, one fact each.
  *
- * What was kept, where most of the money went, what moved most against the
- * period before, the pace against it, and the next thing due. A screen that
- * has nothing true to say is left out rather than padded.
+ * First what to remember (today's reminders, or the week's), then what was
+ * kept, where most of the money went, what moved most against the period
+ * before, and the pace against it. A screen that has nothing true to say is
+ * left out rather than padded; the reminders screen always shows, since
+ * "nothing to remember" is news too.
  */
 
 export type StoryPalette = "green" | "red" | "blue" | "amber" | "violet";
 
 export interface StorySlide {
-  id: "kept" | "spent" | "quiet" | "share" | "mover" | "pace" | "due";
+  id: "reminders" | "kept" | "spent" | "quiet" | "share" | "mover" | "pace";
   /** The giant figure: "$640", "38%", "+$84". */
   big: string;
   label: string;
   say: string;
+  /** Rows under the label, for a screen that lists things: the reminders and when each is due. */
+  list?: { text: string; when: string }[];
   palette: StoryPalette;
 }
+
+/** A reminder as the story tells it. `time` is already formatted ("6:30 AM"). */
+export interface StoryReminder {
+  text: string;
+  daysUntil: number;
+  time?: string | null;
+  amount?: number | null;
+}
+
+// The reminders screen lists at most this many; the rest are counted.
+const LISTED = 3;
 
 export interface StoryPeriod {
   /** "in October", "this week", "in these 9 days". */
@@ -39,8 +54,8 @@ export interface MoneyStoryInput {
   prevCategories: { name: string; amount: number }[];
   /** Spent so far, and in the same stretch before. */
   pace: { now: number; then: number };
-  /** What is due in the next 7 days, soonest first. */
-  due: { name: string; amount: number | null; daysUntil: number }[];
+  /** Reminders (and alarms) due in the next 7 days, soonest first. */
+  reminders: StoryReminder[];
   now?: Date;
 }
 
@@ -93,6 +108,34 @@ export function buildMoneyStory(input: MoneyStoryInput): StorySlide[] {
   const slides: StorySlide[] = [];
   const income = round(input.incomeTotal);
   const spend = round(input.spendTotal);
+
+  // First, what to remember. The figure counts today's reminders when there are any, else the
+  // week's; the rows list the soonest few either way, each with its day, so a quiet today still
+  // shows what is coming.
+  const all = input.reminders;
+  const today = all.filter((r) => r.daysUntil <= 0);
+  const counted = today.length ? today.length : all.length;
+  const whenOf = (r: StoryReminder) => {
+    if (r.daysUntil <= 0) return r.time ?? "Today";
+    const day = r.daysUntil === 1 ? "Tomorrow" : format(addDays(now, r.daysUntil), "EEE");
+    return r.time ? `${day} ${r.time}` : day;
+  };
+  if (all.length) {
+    const more = all.length - LISTED;
+    slides.push({
+      id: "reminders",
+      big: String(counted),
+      label: `${counted === 1 ? "reminder" : "reminders"} ${today.length ? "today" : "this week"}`,
+      say: more > 0 ? `And ${more} more this week.` : "",
+      list: all.slice(0, LISTED).map((r) => ({
+        text: r.amount ? `${r.text} · ${formatCurrency(r.amount)}` : r.text,
+        when: whenOf(r),
+      })),
+      palette: "violet",
+    });
+  } else {
+    slides.push({ id: "reminders", big: "0", label: "reminders this week", say: "Nothing to remember this week.", palette: "green" });
+  }
 
   // What was kept, or what went out beyond what came in.
   if (income > 0) {
@@ -194,23 +237,6 @@ export function buildMoneyStory(input: MoneyStoryInput): StorySlide[] {
             palette: "amber",
           }
     );
-  }
-
-  // The next thing due. Always told: "nothing" is news too.
-  const [next] = input.due;
-  if (next) {
-    const day = addDays(now, next.daysUntil);
-    const when = next.daysUntil <= 0 ? "today" : next.daysUntil === 1 ? "tomorrow" : `on ${format(day, "EEEE")}`;
-    const hasAmount = next.amount !== null && next.amount > 0;
-    slides.push({
-      id: "due",
-      big: hasAmount ? formatCurrency(next.amount!) : next.daysUntil <= 0 ? "Today" : next.daysUntil === 1 ? "Tomorrow" : format(day, "EEE"),
-      label: hasAmount ? `${next.name} ${when}` : next.name,
-      say: input.due.length === 1 ? "The only thing due in the next 7 days." : `The first of ${input.due.length} things due in the next 7 days.`,
-      palette: "violet",
-    });
-  } else {
-    slides.push({ id: "due", big: "$0", label: "due in the next 7 days", say: "Nothing to pay this week.", palette: "green" });
   }
 
   // Each screen its own colour: no two neighbours alike, the last against the first too.
