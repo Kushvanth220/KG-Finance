@@ -45,3 +45,12 @@ supabase/*.local.sql
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+.vercel
+.env*
+
+# Local-only: contains this household's real balances
+green-dot-setup.html
+
+# Local-only: full workspace snapshots, real financial data
+backups/

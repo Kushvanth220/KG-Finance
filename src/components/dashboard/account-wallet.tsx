@@ -9,6 +9,8 @@ import { AnimatedMoney } from "@/components/ui/animated-number";
 import { ACCOUNT_TYPE_META } from "@/components/accounts/account-type-meta";
 import { useFinanceStore } from "@/store/finance-store";
 import { getAvailableCredit, getCreditUtilization } from "@/lib/calculations";
+import { getGreenDotCardBalance, isGreenDotPart } from "@/lib/accounts";
+import { roundMoney } from "@/lib/money";
 import { compareByDateTime, formatCurrency, formatDate, formatPercent } from "@/lib/formatters";
 import { isMoneyIn } from "@/lib/transaction-messages";
 import { CREDIT_LABELS } from "@/lib/settlement";
@@ -43,7 +45,16 @@ function latestLabel(transaction: Transaction): string {
   return transaction.category ?? transaction.notes ?? (transaction.type === "income" ? "Income" : "Payment");
 }
 
-function WalletCard({ account, latest }: { account: Account; latest: Transaction[] }) {
+function WalletCard({
+  account,
+  latest,
+  cardTotal,
+}: {
+  account: Account;
+  latest: Transaction[];
+  /** For a part of the Green Dot card: what the whole card holds. */
+  cardTotal: number | null;
+}) {
   const meta = ACCOUNT_TYPE_META[account.type];
   const isCard = account.type === "credit";
   const hasLimit = isCard && account.creditLimit != null && account.creditLimit > 0;
@@ -63,7 +74,7 @@ function WalletCard({ account, latest }: { account: Account; latest: Transaction
           <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: meta.tint }}>
             {meta.label}
           </span>
-          {account.shared ? (
+          {account.shared || cardTotal !== null ? (
             <span className="rounded-full bg-cyan/15 px-1.5 py-0.5 text-[8px] font-semibold text-cyan">SHARED</span>
           ) : null}
         </span>
@@ -79,13 +90,23 @@ function WalletCard({ account, latest }: { account: Account; latest: Transaction
 
       <div className="mt-1 flex items-end justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[10px] uppercase tracking-wide text-muted">{isCard ? CREDIT_LABELS.cardBalance : "Balance"}</p>
+          <p className="text-[10px] uppercase tracking-wide text-muted">
+            {isCard ? CREDIT_LABELS.cardBalance : cardTotal !== null ? `${PERSON_LABELS[account.person]}'s part` : "Balance"}
+          </p>
           <AnimatedMoney
             value={account.balance}
-            className={cn("block text-2xl font-semibold tabular-nums", isCard && account.balance > 0 && "text-negative")}
+            className={cn(
+              "block text-2xl font-semibold tabular-nums",
+              ((isCard && account.balance > 0) || (cardTotal !== null && account.balance < 0)) && "text-negative"
+            )}
           />
         </div>
-        {hasLimit ? (
+        {cardTotal !== null ? (
+          <div className="shrink-0 text-right">
+            <p className="text-[10px] text-muted">On the card</p>
+            <AnimatedMoney value={cardTotal} className="block text-[13px] font-semibold tabular-nums" />
+          </div>
+        ) : hasLimit ? (
           <div className="shrink-0 text-right">
             <p className="text-[10px] text-muted">{CREDIT_LABELS.leftToSpend}</p>
             <p className="text-[13px] font-semibold text-positive tabular-nums">
@@ -163,6 +184,8 @@ export function AccountWallet({
   initialAccountId: string | null;
 }) {
   const transactions = useFinanceStore((state) => state.transactions);
+  const allAccounts = useFinanceStore((state) => state.accounts);
+  const cardTotal = roundMoney(getGreenDotCardBalance(allAccounts));
 
   const latest = useMemo(() => {
     const ids = new Set(accounts.map((account) => account.id));
@@ -196,7 +219,13 @@ export function AccountWallet({
         geometry={GEOMETRY}
         fadeTo="var(--modal-surface)"
         className="-mx-4 min-h-0 flex-1 sm:-mx-5"
-        renderCard={(account) => <WalletCard account={account} latest={latest.get(account.id) ?? []} />}
+        renderCard={(account) => (
+          <WalletCard
+            account={account}
+            latest={latest.get(account.id) ?? []}
+            cardTotal={isGreenDotPart(account) ? cardTotal : null}
+          />
+        )}
         renderIcon={(account) => <WalletIcon account={account} />}
       />
     </GlassModal>

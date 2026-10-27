@@ -9,7 +9,6 @@ import {
   DEFAULT_SNOOZE_MINUTES,
   doneForThisCycle,
   dueLabel,
-  newerReminder,
   nextDueDate,
   reminderFromLegacyLine,
   renderReminderLine,
@@ -17,10 +16,22 @@ import {
   toStamp,
   type Reminder,
 } from "@/lib/ai/reminders";
+import {
+  mergeReminderLists,
+  mergeTombstones,
+  reminderFingerprint,
+  type ReminderTombstones,
+} from "@/lib/ai/reminder-sync";
 import { ASSISTANT_LANGUAGE } from "@/lib/ai/live-config";
+import { announceRemindersChanged } from "@/lib/supabase/sync";
 import type { Person } from "@/types";
 
 const STORAGE_KEY = "kg-finance-assistant-prefs-v1";
+
+// One save in flight at a time; a change made meanwhile is sent right after.
+let pushing = false;
+let pushAgain = false;
+let pulling: Promise<void> | null = null;
 import { DEFAULT_ASSISTANT_NAME } from "@/lib/ai/assistant-name";
 
 export { DEFAULT_ASSISTANT_NAME };
@@ -38,6 +49,11 @@ interface AssistantPreferencesState {
    * the assistant reads sentences, the app edits structure.
    */
   structuredReminders: Reminder[];
+  /**
+   * Reminders deleted here or on another device, and when. Without these a
+   * merge that keeps everything either side holds would bring them back.
+   */
+  reminderDeleted: ReminderTombstones;
   /** Derived sentences the assistant reads. Never edit directly. */
   reminders: string[];
   setAssistantProfile: (profile: { name: string; voiceGender: AssistantVoiceGender }) => void;
@@ -56,8 +72,10 @@ interface AssistantPreferencesState {
   handleRing: (id: string, outcome: "done" | "snooze", now?: Date) => void;
   setBehaviorInstructions: (instructions: string[]) => void;
   setReminders: (reminders: string[]) => void;
-  setReminderData: (reminders: Reminder[]) => void;
+  setReminderData: (reminders: Reminder[], deleted?: ReminderTombstones) => void;
   hydrateFromServer: () => Promise<void>;
+  /** One pull; `hydrateFromServer` is the way in, so pulls don't pile up. */
+  pullFromServer: () => Promise<void>;
   syncToServer: () => Promise<void>;
   getAssistantName: () => string;
   getVoiceGender: () => AssistantVoiceGender;
@@ -107,6 +125,7 @@ export const useAssistantPreferencesStore = create<AssistantPreferencesState>()(
       language: ASSISTANT_LANGUAGE,
       behaviorInstructions: [],
       structuredReminders: [],
+      reminderDeleted: {},
       reminders: [],
 
       setAssistantProfile: (profile) => {
@@ -233,30 +252,32 @@ export const useAssistantPreferencesStore = create<AssistantPreferencesState>()(
        * Adopt the server's reminders as data. Each one this device also holds
        * is settled by `newerReminder`, so a Done tapped on a notification (made
        * on the server) lands here, and an edit made here is not undone by an
-       * older copy. Ones it doesn't hold came from the other phone.
+       * older copy. Ones it doesn't hold came from another device; ones with
+       * a headstone were deleted on one.
        */
-      setReminderData: (incoming) => {
+      setReminderData: (incoming, deleted = {}) => {
         const local = get().structuredReminders;
-        const byId = new Map(local.map((item) => [item.id, item]));
-        let changed = false;
-        const next = local.map((mine) => {
-          const theirs = incoming.find((item) => item.id === mine.id);
-          if (!theirs) return mine;
-          const merged = newerReminder(mine, theirs);
-          if (merged !== mine) changed = true;
-          return merged;
-        });
-        for (const theirs of incoming) {
-          if (byId.has(theirs.id)) continue;
-          next.push(theirs);
-          changed = true;
+        const localDeleted = get().reminderDeleted ?? {};
+        const tombstones = mergeTombstones(localDeleted, deleted);
+        const next = mergeReminderLists(local, incoming, tombstones);
+        const listMoved = reminderFingerprint(next) !== reminderFingerprint(local);
+        const tombstonesMoved =
+          Object.keys(tombstones).length !== Object.keys(localDeleted).length ||
+          Object.keys(tombstones).some((id) => tombstones[id] !== localDeleted[id]);
+        if (listMoved) {
+          set({ structuredReminders: next, reminders: next.map(renderReminderLine), reminderDeleted: tombstones });
+        } else if (tombstonesMoved) {
+          set({ reminderDeleted: tombstones });
         }
-        if (changed) set({ structuredReminders: next, reminders: next.map(renderReminderLine) });
       },
 
       deleteStructuredReminder: (id) => {
         const next = get().structuredReminders.filter((item) => item.id !== id);
-        set({ structuredReminders: next, reminders: next.map(renderReminderLine) });
+        set({
+          structuredReminders: next,
+          reminders: next.map(renderReminderLine),
+          reminderDeleted: { ...(get().reminderDeleted ?? {}), [id]: new Date().toISOString() },
+        });
         void get().syncToServer();
       },
 
@@ -341,6 +362,18 @@ export const useAssistantPreferencesStore = create<AssistantPreferencesState>()(
       },
 
       hydrateFromServer: async () => {
+        // Several triggers fire together (opening the app, the tab coming
+        // back, another device's signal): they share one pull.
+        if (pulling) return pulling;
+        pulling = get()
+          .pullFromServer()
+          .finally(() => {
+            pulling = null;
+          });
+        return pulling;
+      },
+
+      pullFromServer: async () => {
         try {
           const response = await fetch("/api/ai/preferences", { cache: "no-store" });
           const payload = await response.json();
@@ -353,6 +386,7 @@ export const useAssistantPreferencesStore = create<AssistantPreferencesState>()(
             behavior_instructions?: string[];
             reminders?: string[];
             reminder_data?: Reminder[];
+            reminder_deleted?: ReminderTombstones;
           };
 
           set((state) => ({
@@ -373,31 +407,25 @@ export const useAssistantPreferencesStore = create<AssistantPreferencesState>()(
           // reading them, "legacy-…") goes through setReminders, which
           // matches on text so the schedules set here are not overwritten.
           const data = Array.isArray(prefs.reminder_data) ? prefs.reminder_data : [];
+          const remoteDeleted =
+            prefs.reminder_deleted && typeof prefs.reminder_deleted === "object" ? prefs.reminder_deleted : {};
           const remoteIsLegacy = data.some((item) => item.id.startsWith("legacy-"));
-          if (data.length > 0 && !remoteIsLegacy) {
-            get().setReminderData(data);
+          if (!remoteIsLegacy) {
+            get().setReminderData(data, remoteDeleted);
           } else if (Array.isArray(prefs.reminders)) {
             get().setReminders(prefs.reminders);
           }
 
           // Push back when the server is behind: still on sentences, missing
-          // one of ours, holding an older copy, or reading differently.
-          // Derive fresh from the structured source rather than trusting the
-          // persisted `reminders` array. A stale copy here is what pushed a
-          // re-rendered (and therefore longer) line back to the server on every
-          // load, growing "— remind 5 days before" one suffix at a time.
+          // one of ours, holding an older copy, or not yet told of a delete.
+          // Compared in any order, so two devices that list them differently
+          // don't keep correcting each other.
           const local = get().structuredReminders;
-          const derived = local.map(renderReminderLine);
-          const remote = prefs.reminders ?? [];
-          const remoteById = new Map(data.map((item) => [item.id, item]));
+          const localDeleted = get().reminderDeleted ?? {};
           const drifted =
             remoteIsLegacy ||
-            derived.length !== remote.length ||
-            derived.some((line, index) => line !== remote[index]) ||
-            local.some((item) => {
-              const theirs = remoteById.get(item.id);
-              return !theirs || (item.updatedAt ?? "") > (theirs.updatedAt ?? "");
-            });
+            reminderFingerprint(local) !== reminderFingerprint(data) ||
+            Object.keys(localDeleted).some((id) => !remoteDeleted[id]);
           if (drifted) void get().syncToServer();
         } catch {
           // Supabase table may not exist yet — local prefs still work.
@@ -405,23 +433,46 @@ export const useAssistantPreferencesStore = create<AssistantPreferencesState>()(
       },
 
       syncToServer: async () => {
-        const state = get();
+        if (pushing) {
+          pushAgain = true;
+          return;
+        }
+        pushing = true;
         try {
-          await fetch("/api/ai/preferences", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              assistant_name: state.assistantName,
-              voice_gender: state.voiceGender,
-              wake_listening_enabled: state.wakeListeningEnabled,
-              language: state.language,
-              behavior_instructions: state.behaviorInstructions,
-              reminders: state.reminders,
-              reminder_data: state.structuredReminders,
-            }),
-          });
+          do {
+            pushAgain = false;
+            const state = get();
+            const response = await fetch("/api/ai/preferences", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                assistant_name: state.assistantName,
+                voice_gender: state.voiceGender,
+                wake_listening_enabled: state.wakeListeningEnabled,
+                language: state.language,
+                behavior_instructions: state.behaviorInstructions,
+                reminders: state.reminders,
+                reminder_data: state.structuredReminders,
+                reminder_deleted: state.reminderDeleted ?? {},
+              }),
+            });
+            const payload = (await response.json().catch(() => null)) as {
+              ok?: boolean;
+              preferences?: { reminder_data?: Reminder[]; reminder_deleted?: ReminderTombstones } | null;
+            } | null;
+            if (!payload?.ok) continue;
+            // The server merged in what other devices saved; show that here too.
+            const saved = payload.preferences;
+            if (saved && Array.isArray(saved.reminder_data)) {
+              get().setReminderData(saved.reminder_data, saved.reminder_deleted ?? {});
+            }
+            // And tell the other devices to look now rather than at their next check.
+            announceRemindersChanged();
+          } while (pushAgain);
         } catch {
-          // Offline or table not migrated — ignore.
+          // Offline or table not migrated — the next change or check sends it again.
+        } finally {
+          pushing = false;
         }
       },
 

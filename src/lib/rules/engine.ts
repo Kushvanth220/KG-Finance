@@ -68,6 +68,20 @@ function tokenize(input: string): Token[] {
   return tokens;
 }
 
+// A rule's few calculations are worked out for every entry each time a page draws, so each
+// is read once. A calculation that doesn't read is not kept: it throws again each time.
+const tokenCache = new Map<string, Token[]>();
+const TOKEN_CACHE_LIMIT = 200;
+
+function tokensOf(expression: string): Token[] {
+  const known = tokenCache.get(expression);
+  if (known) return known;
+  const tokens = tokenize(expression);
+  if (tokenCache.size >= TOKEN_CACHE_LIMIT) tokenCache.clear();
+  tokenCache.set(expression, tokens);
+  return tokens;
+}
+
 /**
  * Arithmetic over the entry's values. Unknown names resolve to 0 rather than
  * throwing: a Flex block logged before its tips are known should still show a
@@ -77,7 +91,7 @@ export function evaluateExpression(
   expression: string,
   values: Record<string, string | number>
 ): number {
-  const tokens = tokenize(expression);
+  const tokens = tokensOf(expression);
   let pos = 0;
 
   const peek = () => tokens[pos];
@@ -212,6 +226,19 @@ export function timeToMinutes(value: unknown): number | null {
  * as crossing midnight rather than going negative.
  */
 export function resolveEntry(rule: Rule, entry: RuleEntry): Record<string, number | string> {
+  // Every Flex card and total works out every block again on each draw. Rules
+  // and entries are replaced, never changed in place, so the same pair of
+  // objects always gives the same answer. Callers only read what comes back.
+  const known = resolvedCache.get(entry);
+  if (known && known.rule === rule) return known.values;
+  const values = resolveEntryFresh(rule, entry);
+  resolvedCache.set(entry, { rule, values });
+  return values;
+}
+
+const resolvedCache = new WeakMap<RuleEntry, { rule: Rule; values: Record<string, number | string> }>();
+
+function resolveEntryFresh(rule: Rule, entry: RuleEntry): Record<string, number | string> {
   const resolved: Record<string, number | string> = { ...entry.values };
 
   // Calculations run against a separate context where a time is a NUMBER of

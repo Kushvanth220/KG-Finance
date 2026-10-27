@@ -36,6 +36,8 @@ const KIND_ICON = { pay: Receipt, alarm: AlarmClock, reminder: Bell } as const;
 const kindOf = (r: Reminder): Kind => (r.alarm ? "alarm" : r.amount ? "pay" : "reminder");
 // The agenda lists this many rows, then says how many more.
 const AGENDA_ROWS = 12;
+// Made once: every day of the month is named for screen readers on each draw.
+const DAY_NAME = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric" });
 
 export function WeekCalendar({
   start,
@@ -92,6 +94,13 @@ export function WeekCalendar({
     }
     return map;
   }, [weeks, mine]);
+  // Folded, only one week is on screen; the rest of the month is drawn the first time it opens,
+  // and kept after, so folding it back still slides full rows away.
+  const [drawnAll, setDrawnAll] = useState(false);
+  const unfold = (next: boolean) => {
+    if (next) setDrawnAll(true);
+    setOpen(next);
+  };
 
   // The row that stays when folded: today's week, or the month's first.
   const focus = Math.max(
@@ -207,7 +216,7 @@ export function WeekCalendar({
               className="grid grid-cols-7 overflow-hidden"
               aria-hidden={!shown}
             >
-              {row.map((day, c) => {
+              {(drawnAll || shown) && row.map((day, c) => {
                 if (!day) return <span key={c} />;
                 const inside = inRange(day);
                 const edge = isEdge(day);
@@ -220,7 +229,7 @@ export function WeekCalendar({
                     tabIndex={shown ? 0 : -1}
                     onClick={() => tap(day)}
                     aria-pressed={inside}
-                    aria-label={`${day.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}${items.length ? `, ${items.length} due` : ""}`}
+                    aria-label={`${DAY_NAME.format(day)}${items.length ? `, ${items.length} due` : ""}`}
                     className="relative flex flex-col items-center justify-center gap-0.5 text-[12px] tabular-nums"
                   >
                     {inside ? (
@@ -229,7 +238,9 @@ export function WeekCalendar({
                         aria-hidden
                         className="absolute inset-y-1 inset-x-0.5 rounded-xl"
                         style={{ background: accent, opacity: edge ? 1 : 0.18 }}
-                        initial={still ? false : { scale: 0.3, opacity: 0 }}
+                        // The wave plays for a range picked here, not each time Home opens: a whole
+                        // month of springs starting at once was a large share of opening the page.
+                        initial={still || wave === 0 ? false : { scale: 0.3, opacity: 0 }}
                         animate={{ scale: 1, opacity: edge ? 1 : 0.18 }}
                         transition={{ type: "spring", stiffness: 380, damping: 22, delay: still ? 0 : order * 0.03 }}
                       />
@@ -347,14 +358,14 @@ export function WeekCalendar({
 
       <motion.button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => unfold(!open)}
         drag={still ? false : "y"}
         dragConstraints={{ top: 0, bottom: 0 }}
         dragElastic={0.35}
         dragSnapToOrigin
         onDragEnd={(_, info) => {
-          if (info.offset.y > 18) setOpen(true);
-          else if (info.offset.y < -18) setOpen(false);
+          if (info.offset.y > 18) unfold(true);
+          else if (info.offset.y < -18) unfold(false);
         }}
         aria-expanded={open}
         className="mx-auto mt-0.5 flex cursor-grab flex-col items-center gap-0.5 px-6 pb-0.5 pt-1 text-[9.5px] font-medium text-muted active:cursor-grabbing"

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_CARD_PREFS, arrangeCards, parseCardPrefs, reorderWithin } from "@/lib/home-cards";
+import { DEFAULT_CARD_PREFS, arrangeCards, isDefaultCardPrefs, parseCardPrefs, reorderWithin } from "@/lib/home-cards";
 
 describe("parseCardPrefs", () => {
   it("falls back to the usual layout for nothing saved or a broken value", () => {
@@ -21,6 +21,15 @@ describe("arrangeCards", () => {
       "income",
       "debts",
     ]);
+  });
+});
+
+describe("isDefaultCardPrefs", () => {
+  it("is true only for every card, in the usual order, none hidden", () => {
+    expect(isDefaultCardPrefs(DEFAULT_CARD_PREFS)).toBe(true);
+    expect(isDefaultCardPrefs(parseCardPrefs(null))).toBe(true);
+    expect(isDefaultCardPrefs({ ...DEFAULT_CARD_PREFS, hidden: ["debts"] })).toBe(false);
+    expect(isDefaultCardPrefs(parseCardPrefs(JSON.stringify({ order: ["income", "flex"] })))).toBe(false);
   });
 });
 

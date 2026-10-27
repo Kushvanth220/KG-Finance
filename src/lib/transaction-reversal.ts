@@ -1,5 +1,6 @@
 import { compareByDateTimeAsc } from "@/lib/formatters";
 import { roundMoney } from "@/lib/money";
+import { reverseTransfer } from "@/lib/self-transfer";
 import type {
   Account,
   Debt,
@@ -34,11 +35,12 @@ export function reversePaymentFromAccount(
   let nextDebts = [...debts];
 
   if (account.type === "cash" && cashSourceAccountId) {
-    nextAccounts = nextAccounts.map((a) => {
-      if (a.id === cashSourceAccountId) return { ...a, balance: a.balance + amount };
-      if (a.id === accountId) return { ...a, balance: a.balance + amount };
-      return a;
-    });
+    // The spend only took the money out of the bank — the wallet passed the
+    // cash straight on — so only the bank gets it back. Crediting the wallet
+    // too left cash in it that was never there.
+    nextAccounts = nextAccounts.map((a) =>
+      a.id === cashSourceAccountId ? { ...a, balance: a.balance + amount } : a
+    );
   } else if (account.type === "cash") {
     nextAccounts = nextAccounts.map((a) =>
       a.id === accountId ? { ...a, balance: a.balance + amount } : a
@@ -352,6 +354,23 @@ export function applyTransactionDeletion(state: {
           target.amount,
           target.accountId,
           target.sourceAccountId
+        );
+        if (reversed) {
+          accounts = reversed.accounts;
+          debts = reversed.debts;
+        }
+      }
+      break;
+    }
+
+    case "transfer": {
+      if (target.sourceAccountId && target.targetAccountId) {
+        const reversed = reverseTransfer(
+          accounts,
+          debts,
+          target.sourceAccountId,
+          target.targetAccountId,
+          target.amount
         );
         if (reversed) {
           accounts = reversed.accounts;

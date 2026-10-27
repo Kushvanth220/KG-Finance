@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { AiUserId } from "@/lib/ai/person";
 import { reminderFromLegacyLine, renderReminderLine, type Reminder } from "@/lib/ai/reminders";
+import type { ReminderTombstones } from "@/lib/ai/reminder-sync";
 
 export interface AiChatSession {
   id: string;
@@ -243,17 +244,33 @@ export interface AssistantPreferencesRow {
    * are read back through `reminderFromLegacyLine`, so both shapes load.
    */
   reminder_data: Reminder[];
+  /** Reminders deleted on some device, and when — so the others drop them too. */
+  reminder_deleted: ReminderTombstones;
   updated_at: string;
 }
 
+/** A deleted reminder's headstone in the column. It has no text, so older readers skip it. */
+interface StoredTombstone {
+  id: string;
+  deletedAt: string;
+}
+
+type StoredReminderItem = (Reminder & { line: string }) | StoredTombstone;
+
 /**
  * One stored reminder. The column is JSONB: newer rows keep each reminder as
- * its data plus the sentence, older rows as the sentence alone.
+ * its data plus the sentence, older rows as the sentence alone. Headstones of
+ * deleted ones sit alongside.
  */
-function readStoredReminders(value: unknown): { lines: string[]; data: Reminder[] } {
+function readStoredReminders(value: unknown): {
+  lines: string[];
+  data: Reminder[];
+  deleted: ReminderTombstones;
+} {
   const items = Array.isArray(value) ? value : [];
   const lines: string[] = [];
   const data: Reminder[] = [];
+  const deleted: ReminderTombstones = {};
   items.forEach((item, index) => {
     if (typeof item === "string") {
       lines.push(item);
@@ -262,14 +279,27 @@ function readStoredReminders(value: unknown): { lines: string[]; data: Reminder[
       const { line, ...reminder } = item as Reminder & { line?: string };
       data.push(reminder);
       lines.push(typeof line === "string" ? line : renderReminderLine(reminder));
+    } else if (
+      item &&
+      typeof item === "object" &&
+      typeof (item as StoredTombstone).id === "string" &&
+      typeof (item as StoredTombstone).deletedAt === "string"
+    ) {
+      deleted[(item as StoredTombstone).id] = (item as StoredTombstone).deletedAt;
     }
   });
-  return { lines, data };
+  return { lines, data, deleted };
 }
 
-/** What goes into the column: each reminder's data, with its sentence alongside. */
-export function storedReminders(data: Reminder[]): Array<Reminder & { line: string }> {
-  return data.map((reminder) => ({ ...reminder, line: renderReminderLine(reminder) }));
+/** What goes into the column: each reminder's data with its sentence, then the headstones. */
+export function storedReminders(
+  data: Reminder[],
+  deleted: ReminderTombstones = {}
+): StoredReminderItem[] {
+  return [
+    ...data.map((reminder) => ({ ...reminder, line: renderReminderLine(reminder) })),
+    ...Object.entries(deleted).map(([id, deletedAt]) => ({ id, deletedAt })),
+  ];
 }
 
 /**
@@ -313,15 +343,18 @@ export async function fetchAssistantPreferences(
       : [],
     reminders: stored.lines,
     reminder_data: stored.data,
+    reminder_deleted: stored.deleted,
     updated_at: String(row.updated_at ?? new Date().toISOString()),
   };
 }
 
 export async function upsertAssistantPreferences(
-  payload: Partial<Omit<AssistantPreferencesRow, "workspace_id" | "updated_at" | "reminders" | "reminder_data">> & {
+  payload: Partial<
+    Omit<AssistantPreferencesRow, "workspace_id" | "updated_at" | "reminders" | "reminder_data" | "reminder_deleted">
+  > & {
     behavior_instructions?: string[];
-    /** Sentences (old clients) or data with sentences (`storedReminders`). */
-    reminders?: string[] | Array<Reminder & { line: string }>;
+    /** Sentences (old clients) or data with sentences and headstones (`storedReminders`). */
+    reminders?: string[] | StoredReminderItem[];
   },
   workspaceId = getWorkspaceId()
 ) {
@@ -346,7 +379,12 @@ export async function upsertAssistantPreferences(
   }
   const row = data as Record<string, unknown>;
   const stored = readStoredReminders(row.reminders);
-  return { ...(row as unknown as AssistantPreferencesRow), reminders: stored.lines, reminder_data: stored.data };
+  return {
+    ...(row as unknown as AssistantPreferencesRow),
+    reminders: stored.lines,
+    reminder_data: stored.data,
+    reminder_deleted: stored.deleted,
+  };
 }
 
 /**
@@ -486,7 +524,7 @@ export async function updateStoredReminder(
   const list = [...prefs.reminder_data];
   const updated = { ...change(list[index]!), updatedAt: new Date().toISOString() };
   list[index] = updated;
-  await upsertAssistantPreferences({ reminders: storedReminders(list) }, workspaceId);
+  await upsertAssistantPreferences({ reminders: storedReminders(list, prefs.reminder_deleted) }, workspaceId);
   return updated;
 }
 

@@ -271,6 +271,9 @@ export function getTransactionDisplayMessage(transaction: Transaction): string {
     case "cash_deposit":
       message = `${actorLabel} deposited ${formatCurrency(transaction.amount)} cash${payment}`;
       break;
+    case "transfer":
+      message = `${actorLabel} moved ${formatCurrency(transaction.amount)} between accounts${payment}`;
+      break;
     case "settlement":
       if (transaction.notes && transaction.category === "External") {
         message = `${actorLabel} gave ${formatCurrency(transaction.amount)} to ${

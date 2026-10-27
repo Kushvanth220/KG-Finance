@@ -1,27 +1,38 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { Reorder, useDragControls } from "motion/react";
 import { ChevronDown, ChevronUp, GripVertical, Landmark, Receipt, TrendingUp, Truck, Wallet } from "lucide-react";
 import { GlassModal } from "@/components/ui/glass-modal";
-import { ChartTypePicker, useChartType } from "@/components/dashboard/chart-type-picker";
+import { ChartTypePicker, readType, useChartType } from "@/components/dashboard/chart-type-picker";
+import { CHART_TYPE_OPTIONS, type FlexChartType } from "@/components/charts/flex-chart";
+import { isCloudReachable, onInitialSyncComplete } from "@/lib/supabase/sync";
 import {
   DEFAULT_CARD_PREFS,
   HOME_CARDS,
+  isDefaultCardPrefs,
+  normalizeCardPrefs,
   parseCardPrefs,
   reorderWithin,
   type HomeCardId,
   type HomeCardPrefs,
 } from "@/lib/home-cards";
+import { useFinanceStore } from "@/store/finance-store";
+import type { HomeLayout } from "@/types";
 import { cn } from "@/lib/utils";
 
 /**
  * Laying out Home's deck: drag the cards into an order, hide the ones you don't
- * look at, and pick how the chart cards draw. Kept in this browser, like the
- * chart shapes it shares with the cards themselves.
+ * look at, and pick how the chart cards draw.
+ *
+ * The layout lives in the workspace record, so it travels to every device like
+ * a spend does. This browser's own copy (where layouts lived before) stands in
+ * until a layout has been saved there.
  */
 
 const STORAGE_KEY = "kg-home-cards";
+const CHART_DEFAULTS = { income: "donut", spend: "bar" } as const satisfies Record<string, FlexChartType>;
+type HomeChart = keyof typeof CHART_DEFAULTS;
 const listeners = new Set<() => void>();
 // Where the choice lives when storage is blocked (a private window): it holds for this visit.
 let memoryRaw: string | null = null;
@@ -60,10 +71,78 @@ function subscribe(listener: () => void) {
   };
 }
 
-/** The deck's layout for this browser. The server and first render use the usual one. */
+const noLayout = () => undefined;
+const sharedLayout = () => useFinanceStore.getState().homeLayout;
+
+/** The workspace's layout. Nothing on the server and the first render, so the two agree. */
+function useSharedLayout(): HomeLayout | undefined {
+  return useSyncExternalStore(useFinanceStore.subscribe, sharedLayout, noLayout);
+}
+
+const isChartType = (value: unknown): value is FlexChartType =>
+  CHART_TYPE_OPTIONS.some((option) => option.value === value);
+
+/** Save a layout for every device, keeping whatever part of it isn't changing. */
+function saveLayout(change: { prefs?: HomeCardPrefs; chart?: [HomeChart, FlexChartType] }) {
+  const store = useFinanceStore.getState();
+  const current = store.homeLayout;
+  const prefs = change.prefs ?? (current ? normalizeCardPrefs(current) : readPrefs());
+  const charts = {
+    income: readType("income", CHART_DEFAULTS.income),
+    spend: readType("spend", CHART_DEFAULTS.spend),
+    ...current?.charts,
+    ...(change.chart ? { [change.chart[0]]: change.chart[1] } : {}),
+  };
+  store.setHomeLayout({ order: prefs.order, hidden: prefs.hidden, charts });
+}
+
+/**
+ * A layout made before layouts were shared lives only in this browser, so the
+ * other phone never saw it. Once the first sync has read the workspace and
+ * found no shared layout there, this one is shared — once, and only when it
+ * differs from the usual. Never over a layout already shared, and never while
+ * the cloud couldn't be reached: an offline phone must not bury a newer
+ * layout it simply hasn't seen yet.
+ */
+let offeredOldLayout = false;
+function shareOldLayoutOnce() {
+  if (offeredOldLayout) return;
+  offeredOldLayout = true;
+  onInitialSyncComplete(() => {
+    if (!isCloudReachable() || useFinanceStore.getState().homeLayout) return;
+    const prefs = readPrefs();
+    const usualCharts =
+      readType("income", CHART_DEFAULTS.income) === CHART_DEFAULTS.income &&
+      readType("spend", CHART_DEFAULTS.spend) === CHART_DEFAULTS.spend;
+    if (isDefaultCardPrefs(prefs) && usualCharts) return;
+    saveLayout({ prefs });
+  });
+}
+
+/** The deck's layout, as saved for the workspace. The server and first render use the usual one. */
 export function useHomeCards() {
-  const prefs = useSyncExternalStore(subscribe, readPrefs, () => DEFAULT_CARD_PREFS);
-  return [prefs, writePrefs] as const;
+  useEffect(shareOldLayoutOnce, []);
+  const layout = useSharedLayout();
+  const local = useSyncExternalStore(subscribe, readPrefs, () => DEFAULT_CARD_PREFS);
+  const prefs = useMemo(() => (layout ? normalizeCardPrefs(layout) : local), [layout, local]);
+  const write = (next: HomeCardPrefs) => {
+    writePrefs(next);
+    saveLayout({ prefs: next });
+  };
+  return [prefs, write] as const;
+}
+
+/** How one of Home's chart cards draws, as saved for the workspace. */
+export function useHomeChart(which: HomeChart) {
+  const layout = useSharedLayout();
+  const [local, setLocal] = useChartType(which, CHART_DEFAULTS[which]);
+  const shared = layout?.charts?.[which];
+  const value = isChartType(shared) ? shared : local;
+  const write = (next: FlexChartType) => {
+    setLocal(next);
+    saveLayout({ chart: [which, next] });
+  };
+  return [value, write] as const;
 }
 
 const ICONS: Record<HomeCardId, typeof Truck> = {
@@ -168,8 +247,8 @@ export function HomeCardsEditor({
   prefs: HomeCardPrefs;
   onChange: (next: HomeCardPrefs) => void;
 }) {
-  const [incomeChart, setIncomeChart] = useChartType("income", "donut");
-  const [spendChart, setSpendChart] = useChartType("spend", "bar");
+  const [incomeChart, setIncomeChart] = useHomeChart("income");
+  const [spendChart, setSpendChart] = useHomeChart("spend");
   const items = prefs.order.filter((id) => available.includes(id));
   const shownCount = items.filter((id) => !prefs.hidden.includes(id)).length;
 
@@ -213,7 +292,7 @@ export function HomeCardsEditor({
       <div className="space-y-3">
         <p className="text-xs text-muted">
           Drag a card by its handle to change the order, switch off the ones you don&apos;t need, and choose how the
-          charts are drawn. This phone keeps its own layout.
+          charts are drawn. Your other devices get the same layout.
         </p>
         <Reorder.Group axis="y" values={items} onReorder={setItems} className="space-y-2">
           {items.map((id, index) => (

@@ -15,7 +15,8 @@ import { cn } from "@/lib/utils";
 
 const STORAGE_PREFIX = "kg-chart-type:";
 
-function readType(key: string, fallback: FlexChartType): FlexChartType {
+/** The shape this browser remembers for one panel, outside React. */
+export function readType(key: string, fallback: FlexChartType): FlexChartType {
   if (typeof window === "undefined") return fallback;
   try {
     const stored = window.localStorage.getItem(STORAGE_PREFIX + key);

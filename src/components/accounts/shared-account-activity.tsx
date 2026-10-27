@@ -1,277 +1,240 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { format } from "date-fns";
-import { ArrowDownLeft, ArrowUpRight, ChevronRight, SlidersHorizontal } from "lucide-react";
+import { ChevronDown, RotateCcw } from "lucide-react";
+import { AnimatedMoney } from "@/components/ui/animated-number";
 import { GlassButton } from "@/components/ui/glass-button";
 import { GlassModal } from "@/components/ui/glass-modal";
-import { getGreenDotActivitySummary, getGreenDotLedgerEntries } from "@/lib/account-activity";
-import { formatGreenDotTrackingLabel } from "@/lib/greendot-tracking";
-import { formatCurrency, formatDateTime } from "@/lib/formatters";
+import { getGreenDotAccounts } from "@/lib/account-activity";
+import { getGreenDotParts } from "@/lib/accounts";
+import { formatCurrency, formatDate, formatDateTime } from "@/lib/formatters";
+import { accountMovesSince, balancesAtStartOf } from "@/lib/running-balance";
+import { zonedMonth, zonedToday } from "@/lib/zoned-date";
 import { useFinanceStore } from "@/store/finance-store";
-import { PERSON_LABELS, type Person } from "@/types";
+import { PERSON_LABELS, type Transaction } from "@/types";
+import { cn } from "@/lib/utils";
 
-interface SharedAccountActivityProps {
-  accountId: string;
-  accountName: string;
+/**
+ * The Green Dot card for the two people who share it: how much each of them
+ * has on it right now, and every entry since counting began — whose money it
+ * moved, by how much, and what that person had left after it. Nothing else.
+ *
+ * Tap a name to see only that person's entries; tap it again for both.
+ */
+
+/** Entries shown before "Show all". */
+const FOLD = 7;
+
+/** "+$20.00" / "-$15.00", written as formatCurrency writes it. */
+function signed(value: number) {
+  return `${value < 0 ? "-" : "+"}${formatCurrency(Math.abs(value))}`;
 }
 
-function PersonActivityRow({
-  person,
-  earnedThisMonth,
-  spentThisMonth,
-  netThisMonth,
-  adjustmentsThisMonth,
-  onViewHistory,
-}: {
-  person: Person;
-  earnedThisMonth: number;
-  spentThisMonth: number;
-  netThisMonth: number;
-  adjustmentsThisMonth: number;
-  onViewHistory: (person: Person) => void;
-}) {
-  // Net folds in balance corrections, so show them whenever they exist —
-  // otherwise earned - spent visibly fails to equal the net underneath it.
-  const hasAdjustment = Math.abs(adjustmentsThisMonth) > 0.009;
-  return (
-    <button
-      type="button"
-      onClick={() => onViewHistory(person)}
-      className="w-full rounded-lg bg-black/[0.03] dark:bg-white/[0.04] px-2.5 py-2 space-y-2 text-left hover:bg-black/[0.06] dark:hover:bg-white/[0.07] transition-colors"
-    >
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold">{PERSON_LABELS[person]}</p>
-        <ChevronRight className="w-3.5 h-3.5 text-muted shrink-0" />
-      </div>
-      <div className="grid grid-cols-2 gap-2">
-        <div>
-          <p className="text-[10px] text-muted flex items-center gap-1">
-            <ArrowDownLeft className="w-3 h-3 text-positive" />
-            Earned
-          </p>
-          <p className="text-sm font-bold text-positive tabular-nums">
-            +{formatCurrency(earnedThisMonth)}
-          </p>
-        </div>
-        <div>
-          <p className="text-[10px] text-muted flex items-center gap-1">
-            <ArrowUpRight className="w-3 h-3 text-negative" />
-            Spent
-          </p>
-          <p className="text-sm font-bold text-negative tabular-nums">
-            -{formatCurrency(spentThisMonth)}
-          </p>
-        </div>
-      </div>
-      {hasAdjustment ? (
-        <div className="flex items-center justify-between text-[10px] border-t border-black/5 dark:border-white/10 pt-1.5">
-          <span className="text-muted flex items-center gap-1">
-            <SlidersHorizontal className="w-3 h-3" />
-            Balance fixes
-          </span>
-          <span
-            className={`font-semibold tabular-nums ${
-              adjustmentsThisMonth >= 0 ? "text-positive" : "text-negative"
-            }`}
-          >
-            {adjustmentsThisMonth >= 0 ? "+" : "-"}
-            {formatCurrency(Math.abs(adjustmentsThisMonth))}
-          </span>
-        </div>
-      ) : null}
-      <div className="flex items-center justify-between text-[10px] border-t border-black/5 dark:border-white/10 pt-1.5">
-        <span className="text-muted">Net this month</span>
-        <span
-          className={`font-semibold tabular-nums ${
-            netThisMonth >= 0 ? "text-positive" : "text-negative"
-          }`}
-        >
-          {netThisMonth >= 0 ? "+" : "-"}
-          {formatCurrency(Math.abs(netThisMonth))}
-        </span>
-      </div>
-    </button>
-  );
+/** What an entry was, in a few words. */
+function entryLabel(transaction: Transaction): string {
+  if (transaction.type === "transfer") return transaction.paymentMethod ?? "Moved between accounts";
+  if (transaction.type === "balance_adjustment") return transaction.notes ?? "Balance fix";
+  return transaction.category ?? transaction.notes ?? (transaction.type === "income" ? "Income" : "Payment");
 }
 
-export function SharedAccountActivity({ accountName }: SharedAccountActivityProps) {
+export function SharedAccountActivity() {
   const accounts = useFinanceStore((state) => state.accounts);
   const transactions = useFinanceStore((state) => state.transactions);
   const greenDotTrackingStartDate = useFinanceStore((state) => state.greenDotTrackingStartDate);
+  const setGreenDotTrackingStartDate = useFinanceStore((state) => state.setGreenDotTrackingStartDate);
 
-  const [historyPerson, setHistoryPerson] = useState<Person | "all" | null>(null);
+  // Counting starts on the chosen day, or this month's first when none was chosen.
+  const since = greenDotTrackingStartDate ?? `${zonedMonth()}-01`;
+  const sinceLabel = formatDate(since);
 
-  const activity = useMemo(
-    () => getGreenDotActivitySummary(accounts, transactions, new Date(), greenDotTrackingStartDate),
-    [accounts, transactions, greenDotTrackingStartDate]
+  const parts = useMemo(() => getGreenDotParts(accounts), [accounts]);
+  // Each person's part; an old merged card stands alone under its own name.
+  const holders = useMemo(
+    () =>
+      (parts.length ? parts : getGreenDotAccounts(accounts)).map((account) => ({
+        account,
+        name: parts.length ? PERSON_LABELS[account.person] : account.name,
+      })),
+    [parts, accounts]
+  );
+  const nameOf = (accountId: string) => holders.find((holder) => holder.account.id === accountId)?.name ?? "";
+
+  const moves = useMemo(
+    () =>
+      accountMovesSince(
+        since,
+        holders.map((holder) => holder.account.id),
+        accounts,
+        transactions
+      ),
+    [since, holders, accounts, transactions]
   );
 
-  const monthLabel = format(new Date(), "MMMM");
-  const trackingLabel = formatGreenDotTrackingLabel(greenDotTrackingStartDate);
-  const monthRange = useMemo(() => {
-    const now = new Date();
-    const trackingStart = greenDotTrackingStartDate
-      ? new Date(`${greenDotTrackingStartDate}T00:00:00`)
-      : null;
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  const [only, setOnly] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
+  const visible = only ? moves.filter(({ move }) => move.accountId === only) : moves;
+  const shown = showAll ? visible : visible.slice(0, FOLD);
 
-    if (trackingStart && trackingStart > monthEnd) return null;
-
-    return {
-      start: trackingStart && trackingStart > monthStart ? trackingStart : monthStart,
-      end: monthEnd,
-    };
-  }, [greenDotTrackingStartDate]);
-
-  const ledgerEntries = useMemo(() => {
-    if (!historyPerson || !monthRange) return [];
-    return getGreenDotLedgerEntries(
-      accounts,
-      transactions,
-      monthRange,
-      historyPerson === "all" ? undefined : historyPerson,
-      greenDotTrackingStartDate
-    );
-  }, [historyPerson, accounts, transactions, monthRange, greenDotTrackingStartDate]);
-
-  const ledgerNet = ledgerEntries.reduce((sum, entry) => sum + entry.signedAmount, 0);
+  // Starting fresh: count from a new day. Only the day moves; no entry and no balance changes.
+  const [restartDay, setRestartDay] = useState<string | null>(null);
+  const restartPreview = useMemo(
+    () => (restartDay ? balancesAtStartOf(restartDay, accounts, transactions) : null),
+    [restartDay, accounts, transactions]
+  );
+  const today = zonedToday();
+  const restartValid = restartDay != null && restartDay <= today && restartDay !== greenDotTrackingStartDate;
 
   return (
     <>
-      <div className="rounded-xl border border-feature/20 bg-feature/5 px-3 py-2.5 space-y-2">
+      <div className="space-y-3 rounded-xl border border-feature/20 bg-feature/5 px-3 py-3">
         <div className="flex items-center justify-between gap-2">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-feature">
-              GreenDot · {monthLabel}
-            </p>
-            {trackingLabel ? (
-              <p className="text-[10px] text-muted mt-0.5">
-                New tracking since {trackingLabel} · started at $0
-              </p>
-            ) : null}
-          </div>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-feature">
+            Green Dot · since {sinceLabel}
+          </p>
           <GlassButton
             type="button"
             variant="ghost"
             size="sm"
             className="!px-2 !py-1 text-[10px] h-auto"
-            onClick={() => setHistoryPerson("all")}
+            onClick={() => setRestartDay(today)}
           >
-            View all
+            <RotateCcw className="h-3 w-3" /> Start fresh
           </GlassButton>
         </div>
 
-        <PersonActivityRow
-          person="kushvanth"
-          {...activity.kushvanth}
-          onViewHistory={setHistoryPerson}
-        />
-        <PersonActivityRow
-          person="g"
-          {...activity.g}
-          onViewHistory={setHistoryPerson}
-        />
-
-        {Math.abs(activity.greenDotAdjustmentsThisMonth) > 0.009 && (
-          <div className="flex items-center justify-between rounded-lg bg-black/[0.03] dark:bg-white/[0.04] px-2.5 py-2 text-[10px]">
-            <span className="text-muted flex items-center gap-1">
-              <SlidersHorizontal className="w-3 h-3" />
-              GreenDot balance fixes
-            </span>
-            <span
-              className={`font-semibold tabular-nums ${
-                activity.greenDotAdjustmentsThisMonth >= 0 ? "text-positive" : "text-negative"
-              }`}
-            >
-              {activity.greenDotAdjustmentsThisMonth >= 0 ? "+" : "-"}
-              {formatCurrency(Math.abs(activity.greenDotAdjustmentsThisMonth))}
-            </span>
+        {holders.length ? (
+          <div className="grid grid-cols-2 gap-2">
+            {holders.map(({ account, name }) => {
+              const picked = only === account.id;
+              return (
+                <button
+                  key={account.id}
+                  type="button"
+                  onClick={() => {
+                    setOnly(picked ? null : account.id);
+                    setShowAll(false);
+                  }}
+                  aria-pressed={picked}
+                  className={cn(
+                    "min-w-0 rounded-xl px-3 py-2 text-left transition-colors",
+                    picked
+                      ? "bg-feature/15 ring-1 ring-inset ring-feature/50"
+                      : "bg-black/[0.03] hover:bg-black/[0.06] dark:bg-white/[0.04] dark:hover:bg-white/[0.07]"
+                  )}
+                >
+                  <p className="truncate text-xs font-semibold">{name}</p>
+                  <AnimatedMoney
+                    value={account.balance}
+                    className={cn(
+                      "block text-xl font-semibold tabular-nums",
+                      account.balance < 0 ? "text-negative" : "text-foreground"
+                    )}
+                  />
+                </button>
+              );
+            })}
           </div>
+        ) : (
+          <p className="text-xs text-muted">No Green Dot account yet.</p>
         )}
 
-        <div className="rounded-lg border border-feature/15 px-2.5 py-2 text-[10px] space-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-muted">Combined net · {monthLabel}</span>
-            <span
-              className={`font-semibold tabular-nums ${
-                activity.combinedNetThisMonth >= 0 ? "text-positive" : "text-negative"
-              }`}
+        <div className="overflow-hidden rounded-xl bg-black/[0.03] dark:bg-white/[0.04]">
+          <p className="border-b border-black/5 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted dark:border-white/10">
+            {only ? `${nameOf(only)}'s history` : "History"}
+          </p>
+          {visible.length === 0 ? (
+            <p className="px-3 py-3 text-xs text-muted">
+              {only
+                ? `Nothing for ${nameOf(only)} since ${sinceLabel} yet.`
+                : `Nothing on Green Dot since ${sinceLabel} yet.`}
+            </p>
+          ) : (
+            <ul className="divide-y divide-black/5 dark:divide-white/10">
+              {shown.map(({ transaction, move }) => (
+                <li key={`${transaction.id}-${move.accountId}`} className="flex items-start justify-between gap-3 px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-medium">{entryLabel(transaction)}</p>
+                    <p className="text-[10px] text-muted">
+                      {nameOf(move.accountId)} · {formatDateTime(transaction.date, transaction.time, transaction.timestamp)}
+                    </p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p
+                      className={cn(
+                        "text-xs font-semibold tabular-nums",
+                        move.change > 0 ? "text-positive" : "text-foreground"
+                      )}
+                    >
+                      {signed(move.change)}
+                    </p>
+                    <p className={cn("text-[10px] tabular-nums", move.balance < 0 ? "text-negative" : "text-muted")}>
+                      {formatCurrency(move.balance)} left
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+          {visible.length > FOLD ? (
+            <button
+              type="button"
+              onClick={() => setShowAll((open) => !open)}
+              aria-expanded={showAll}
+              className="flex w-full items-center justify-center gap-1 border-t border-black/5 py-2 text-[11px] font-semibold text-accent dark:border-white/10"
             >
-              {activity.combinedNetThisMonth >= 0 ? "+" : "-"}
-              {formatCurrency(Math.abs(activity.combinedNetThisMonth))}
-            </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-muted">GreenDot balance</span>
-            <span className="font-semibold tabular-nums">
-              {formatCurrency(activity.currentBalance)}
-            </span>
-          </div>
+              {showAll ? "Show fewer" : `Show all ${visible.length}`}
+              <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", showAll && "rotate-180")} />
+            </button>
+          ) : null}
         </div>
-
-        <p className="text-[10px] text-muted px-0.5">
-          Tap a name for GreenDot activity since{" "}
-          {trackingLabel ?? "tracking started"}. Main History still keeps older lines.
-        </p>
       </div>
 
-      <GlassModal
-        open={historyPerson !== null}
-        onClose={() => setHistoryPerson(null)}
-        title={
-          historyPerson === "all"
-            ? `GreenDot · ${monthLabel}`
-            : `${PERSON_LABELS[historyPerson as Person]} · GreenDot · ${monthLabel}`
-        }
-      >
-        {!monthRange || ledgerEntries.length === 0 ? (
-          <p className="text-sm text-muted py-4 text-center">
-            No GreenDot activity yet
-            {trackingLabel ? ` since ${trackingLabel}` : ""}
-            {historyPerson && historyPerson !== "all"
-              ? ` for ${PERSON_LABELS[historyPerson]}`
-              : ""}
-            .
+      <GlassModal open={restartDay !== null} onClose={() => setRestartDay(null)} title="Start Green Dot fresh">
+        <div className="space-y-4">
+          <p className="text-xs text-muted leading-relaxed">
+            The history here will start from the day you pick. Nothing is deleted and no balance changes:
+            every older entry stays in History.
           </p>
-        ) : (
-          <>
-            <div className="max-h-[60vh] overflow-y-auto divide-y divide-black/5 dark:divide-white/10 -mx-1">
-              {ledgerEntries.map((entry) => (
-                <div key={entry.id} className="px-1 py-2.5 flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium truncate">{entry.label}</p>
-                    <p className="text-[10px] text-muted mt-0.5">
-                      {PERSON_LABELS[entry.person]} ·{" "}
-                      {formatDateTime(entry.date, entry.time, entry.timestamp)}
-                    </p>
-                    <p className="text-[10px] text-muted capitalize mt-0.5">{entry.kind}</p>
-                  </div>
-                  <p
-                    className={`text-sm font-bold tabular-nums shrink-0 ${
-                      entry.signedAmount >= 0 ? "text-positive" : "text-negative"
-                    }`}
-                  >
-                    {entry.signedAmount >= 0 ? "+" : "-"}
-                    {formatCurrency(Math.abs(entry.signedAmount))}
-                  </p>
+          <div>
+            <label htmlFor="greendot-restart-day" className="text-sm font-medium text-muted px-1">
+              Start from
+            </label>
+            <input
+              id="greendot-restart-day"
+              type="date"
+              value={restartDay ?? ""}
+              max={today}
+              onChange={(event) => setRestartDay(event.target.value)}
+              className="glass rounded-2xl px-4 py-3 w-full mt-1.5 outline-none"
+            />
+          </div>
+          {restartPreview ? (
+            <div className="rounded-xl bg-black/[0.03] px-3 py-2 dark:bg-white/[0.04]">
+              <p className="text-[10px] uppercase tracking-wide text-muted">
+                What each had that morning · {restartDay ? formatDate(restartDay) : ""}
+              </p>
+              {parts.map((part) => (
+                <div key={part.id} className="mt-1 flex items-center justify-between text-xs">
+                  <span>{PERSON_LABELS[part.person]}</span>
+                  <span className="font-semibold tabular-nums">{formatCurrency(restartPreview.get(part.id) ?? 0)}</span>
                 </div>
               ))}
             </div>
-            <div className="mt-3 pt-3 border-t border-black/5 dark:border-white/10 flex items-center justify-between text-xs">
-              <span className="text-muted">Net in this list</span>
-              <span
-                className={`font-bold tabular-nums ${
-                  ledgerNet >= 0 ? "text-positive" : "text-negative"
-                }`}
-              >
-                {ledgerNet >= 0 ? "+" : "-"}
-                {formatCurrency(Math.abs(ledgerNet))}
-              </span>
-            </div>
-          </>
-        )}
+          ) : null}
+          <GlassButton
+            className="w-full"
+            disabled={!restartValid}
+            onClick={() => {
+              if (!restartValid || !restartDay) return;
+              setGreenDotTrackingStartDate(restartDay);
+              setRestartDay(null);
+            }}
+          >
+            {restartDay === greenDotTrackingStartDate
+              ? "Already starting from this day"
+              : `Start from ${restartDay ? formatDate(restartDay) : "this day"}`}
+          </GlassButton>
+        </div>
       </GlassModal>
     </>
   );

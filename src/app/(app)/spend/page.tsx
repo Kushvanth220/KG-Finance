@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
   ArrowDownLeft,
+  ArrowLeftRight,
   ArrowRight,
   ArrowUpRight,
   Banknote,
@@ -10,7 +11,6 @@ import {
   Check,
   ChevronDown,
   CreditCard,
-  Plus,
   RotateCcw,
   Undo2,
   Wallet,
@@ -20,6 +20,10 @@ import { GlassButton } from "@/components/ui/glass-button";
 import { GlassCard } from "@/components/ui/glass-card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { SpendCategoryManager } from "@/components/spend/spend-category-manager";
+import { AmountCalculator } from "@/components/spend/amount-calculator";
+import { SpendDial } from "@/components/spend/spend-dial";
+import { GlassModal } from "@/components/ui/glass-modal";
+import { SelfTransferSheet } from "@/components/accounts/self-transfer-sheet";
 import { useFinanceStore } from "@/store/finance-store";
 import { getAccountsForPerson, isSharedAccount } from "@/lib/accounts";
 import { formatCurrency, parseAppDateTime } from "@/lib/formatters";
@@ -70,8 +74,6 @@ interface SavedSpend {
 }
 
 const UNDO_SECONDS = 8;
-/** Tiles shown before "Show all": four rows of two. */
-const CATEGORY_FOLD = 8;
 
 function isSharedExpense(owner: ExpenseOwner): boolean {
   return owner === "both";
@@ -120,7 +122,11 @@ export default function SpendPage() {
   const [splitPayments, setSplitPayments] = useState<Partial<Record<Person, PaymentSelection>>>({});
 
   const [manageOpen, setManageOpen] = useState(false);
-  const [allCategories, setAllCategories] = useState(false);
+  // The amount text the calculator opened on; null while it is closed.
+  const [calculatorFrom, setCalculatorFrom] = useState<string | null>(null);
+  const [transferOpen, setTransferOpen] = useState(false);
+  // Every category, from the dial's "More" place.
+  const [categorySheet, setCategorySheet] = useState(false);
   const [saved, setSaved] = useState<SavedSpend | null>(null);
   const [undoLeft, setUndoLeft] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
@@ -161,12 +167,6 @@ export default function SpendPage() {
     return { lead, all: [...lead, ...rest] };
   }, [spendCategories, transactions]);
 
-  const selectedIndex = orderedCategories.all.findIndex((c) => c.id === selection?.categoryId);
-  const categoriesOpen = allCategories || selectedIndex >= CATEGORY_FOLD;
-  const shownCategories = categoriesOpen
-    ? orderedCategories.all
-    : orderedCategories.all.slice(0, CATEGORY_FOLD);
-
   const suggestions = useMemo(
     () => (notesFocused ? noteSuggestions(transactions, notes, 4) : []),
     [transactions, notes, notesFocused]
@@ -190,7 +190,7 @@ export default function SpendPage() {
     setPendingCashFor(null);
     setSplitPayments({});
     setManageOpen(false);
-    setAllCategories(false);
+    setCategorySheet(false);
     setSaved(null);
     setUndoLeft(0);
     setNotice(null);
@@ -246,6 +246,13 @@ export default function SpendPage() {
   const appendPlus = () => {
     setAmount((current) => `${current.replace(/[+\-*/x×÷]\s*$/, "")}+`);
     amountRef.current?.focus();
+  };
+
+  const openCalculator = () => {
+    // Taken before the field lets go of focus, which would settle "12+3" into "15".
+    setCalculatorFrom(amount);
+    // And the phone's keyboard goes down, so the keypad isn't hidden under it.
+    amountRef.current?.blur();
   };
 
   const handleNotesChange = (val: string) => {
@@ -671,18 +678,8 @@ export default function SpendPage() {
     step === "details" ? "1 · Details" : step === "payment" ? "2 · Pay" : step === "cash-source" ? "2 · Cash" : "Done";
   const currentStep = step === "details" ? 1 : 2;
 
-  const selectionMeta =
-    expenseOwner === "both"
-      ? "Both of you"
-      : PERSON_LABELS[expenseOwner as Person];
-
   const isToday = spendDate === todayIso();
   const dateLabel = isToday ? "Today" : format(parseAppDateTime(spendDate), "MM/dd/yyyy");
-
-  // Big figures shrink as they grow so a long sum still fits one line.
-  const amountSize =
-    amount.length <= 6 ? "text-5xl" : amount.length <= 10 ? "text-4xl" : "text-3xl";
-  const amountWidth = `${Math.max(1, amount.length) + 0.4}ch`;
 
   const segment = (active: boolean) =>
     cn(
@@ -712,6 +709,19 @@ export default function SpendPage() {
             className="hit text-[10px] text-accent font-medium px-2 py-1"
           >
             Cancel
+          </button>
+        )}
+        {/* Own money between own accounts isn't a spend, so it has its own sheet rather than a step. */}
+        {step === "details" && (
+          <button
+            type="button"
+            onClick={() => {
+              amountRef.current?.blur();
+              setTransferOpen(true);
+            }}
+            className="inline-flex items-center gap-1 rounded-lg glass px-2.5 py-1.5 text-[11px] font-semibold text-accent"
+          >
+            <ArrowLeftRight className="h-3 w-3" /> Self transfer
           </button>
         )}
       </div>
@@ -809,54 +819,50 @@ export default function SpendPage() {
             </div>
           </div>
 
-          <div>
-            <div className="flex items-baseline justify-center gap-1 py-0.5">
-              <span className={cn("text-2xl font-light", refund ? "text-positive" : "text-muted")}>
-                {refund ? "+$" : "$"}
-              </span>
-              <input
-                ref={amountRef}
-                type="text"
-                inputMode="decimal"
-                autoComplete="off"
-                value={amount}
-                onChange={(e) => handleAmountChange(e.target.value)}
-                onBlur={settleExpression}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    handleDetailsNext();
-                  }
-                }}
-                placeholder="0"
-                style={{ width: amountWidth }}
-                className={cn(
-                  "max-w-full bg-transparent text-center font-bold tabular-nums outline-none transition-[font-size] duration-150",
-                  amountSize,
-                  refund && "text-positive"
-                )}
-                aria-label="Amount"
-                autoFocus
-              />
-              <button
-                type="button"
-                onClick={appendPlus}
-                aria-label="Add another item"
-                title="Add another item to the same receipt"
-                className={cn(
-                  "hit ml-1 flex h-7 w-7 items-center justify-center rounded-full glass text-accent transition-opacity",
-                  amount.trim() === "" && "opacity-40"
-                )}
-              >
-                <Plus className="h-3.5 w-3.5" />
-              </button>
-            </div>
+          {/* The amount in the middle of a ring of categories (Spend 6, "Dial"). */}
+          <div className="space-y-1">
+            <SpendDial
+              amount={amount}
+              amountRef={amountRef}
+              onAmountChange={handleAmountChange}
+              onAmountBlur={settleExpression}
+              onEnter={handleDetailsNext}
+              refund={refund}
+              categories={orderedCategories.all}
+              selectedId={selection?.categoryId ?? null}
+              onSelect={selectCategory}
+              onMore={() => setCategorySheet(true)}
+              onAppendPlus={appendPlus}
+              onOpenCalculator={openCalculator}
+            />
             {hasOperator(amount) ? (
               <p className="text-center text-xs text-muted tabular-nums">= {formatCurrency(parsedAmount)}</p>
+            ) : null}
+            {selectedCategory?.budget ? (
+              <BudgetBar
+                spent={categorySpentThisMonth(transactions, selectedCategory.name)}
+                budget={selectedCategory.budget}
+                className="mx-auto max-w-[260px]"
+              />
             ) : null}
             {refund ? (
               <p className="text-center text-[10px] text-positive">Goes back into the account it came from</p>
             ) : null}
+            <div className="flex items-center justify-center gap-3 pt-0.5">
+              <button
+                type="button"
+                onClick={() => setCategorySheet(true)}
+                className="text-[11px] font-medium text-accent"
+              >
+                All {orderedCategories.all.length} categories
+              </button>
+              <span className="text-[11px] text-muted" aria-hidden>
+                ·
+              </span>
+              <button type="button" onClick={() => setManageOpen(true)} className="text-[11px] font-medium text-accent">
+                Manage categories
+              </button>
+            </div>
           </div>
 
           {/* The card gives each child z-index 1 (kg-spotlight), so the
@@ -894,71 +900,6 @@ export default function SpendPage() {
           </div>
 
           <div className="space-y-2">
-            {selection?.categoryId && (
-              <div className="rounded-xl border border-positive/30 bg-positive/10 px-3 py-2 flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold truncate">
-                    {selectedCategory ? `${categoryLook(selectedCategory).emoji} ` : ""}
-                    {categoryLabel}
-                  </p>
-                  <p className="text-[11px] text-muted truncate">{selectionMeta}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelection(null);
-                    setManualCategoryPick(false);
-                  }}
-                  className="text-[11px] text-accent font-medium shrink-0"
-                >
-                  Change
-                </button>
-              </div>
-            )}
-
-            <div className="flex items-center justify-between px-1">
-              <p className="text-[11px] text-muted">Category</p>
-              <button
-                type="button"
-                onClick={() => setManageOpen(true)}
-                className="text-[11px] text-accent font-medium"
-              >
-                Manage categories
-              </button>
-            </div>
-
-            {/* Four rows, then a button — a scroll box inside a scrolling page
-                is a thumb trap. The chosen tile is never hidden. */}
-            <div className="grid grid-cols-2 gap-1.5 p-0.5">
-              {shownCategories.map((category) => (
-                <CategoryButton
-                  key={category.id}
-                  label={category.name}
-                  sub={keywordsSubLine(category)}
-                  look={categoryLook(category)}
-                  tag={orderedCategories.lead.includes(category) ? "Recent" : undefined}
-                  selected={selection?.categoryId === category.id}
-                  onClick={() => selectCategory(category)}
-                  budget={
-                    category.budget
-                      ? { spent: categorySpentThisMonth(transactions, category.name), budget: category.budget }
-                      : undefined
-                  }
-                />
-              ))}
-            </div>
-
-            {orderedCategories.all.length > CATEGORY_FOLD ? (
-              <button
-                type="button"
-                onClick={() => setAllCategories((v) => !v)}
-                className="hit flex w-full items-center justify-center gap-1 py-1 text-[11px] font-semibold text-accent"
-              >
-                {categoriesOpen ? "Show fewer" : `Show all ${orderedCategories.all.length}`}
-                <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", categoriesOpen && "rotate-180")} />
-              </button>
-            ) : null}
-
             <div>
               <p className="text-[11px] text-muted px-1 mb-1">Who is this for?</p>
               <div className="glass rounded-xl p-0.5 flex gap-0.5">
@@ -1185,6 +1126,64 @@ export default function SpendPage() {
         onClose={() => setManageOpen(false)}
         onCategoryDeleted={handleCategoryDeleted}
       />
+
+      {/* Every category, the tiles from before: recent ones first, budgets on each. */}
+      <GlassModal open={categorySheet} onClose={() => setCategorySheet(false)} title="All categories">
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-1.5 p-0.5">
+            {orderedCategories.all.map((category) => (
+              <CategoryButton
+                key={category.id}
+                label={category.name}
+                sub={keywordsSubLine(category)}
+                look={categoryLook(category)}
+                tag={orderedCategories.lead.includes(category) ? "Recent" : undefined}
+                selected={selection?.categoryId === category.id}
+                onClick={() => {
+                  selectCategory(category);
+                  setCategorySheet(false);
+                }}
+                budget={
+                  category.budget
+                    ? { spent: categorySpentThisMonth(transactions, category.name), budget: category.budget }
+                    : undefined
+                }
+              />
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setCategorySheet(false);
+              setManageOpen(true);
+            }}
+            className="w-full text-center text-[12px] font-semibold text-accent"
+          >
+            Manage categories
+          </button>
+        </div>
+      </GlassModal>
+
+      {/* Mounted only while open, so each opening starts from what the amount says now. */}
+      {calculatorFrom !== null ? (
+        <AmountCalculator
+          open
+          initial={calculatorFrom}
+          onClose={() => setCalculatorFrom(null)}
+          onUse={handleAmountChange}
+        />
+      ) : null}
+
+      {transferOpen ? (
+        <SelfTransferSheet
+          person={paidByMode === "split" ? "kushvanth" : paidByMode}
+          onClose={() => setTransferOpen(false)}
+          onDone={(id) => {
+            const row = useFinanceStore.getState().transactions.find((t) => t.id === id);
+            if (row) setNotice(`${row.autoMessage ?? "Moved between accounts"}. It's in History; nothing was counted as spending.`);
+          }}
+        />
+      ) : null}
 
       <ConfirmDialog
         open={duplicate !== null}

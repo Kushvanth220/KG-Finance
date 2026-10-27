@@ -24,17 +24,27 @@ export function parseAppDateTime(
   return new Date(year, month - 1, day, 12, 0, 0);
 }
 
+// Made once: building a formatter costs far more than using one, and a page
+// formats hundreds of amounts and dates every time it is opened.
+const DOLLARS = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 2,
+});
+const DOLLARS_AND_CENTS = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
 export function formatCurrency(amount: number): string {
   // Whole dollars stay compact ("$4,000"), but anything with cents shows BOTH
   // digits. minimumFractionDigits: 0 alone rendered 12.10 as "$12.1", which is
   // not a currency amount.
   const hasCents = Math.round(Math.abs(amount) * 100) % 100 !== 0;
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: hasCents ? 2 : 0,
-    maximumFractionDigits: 2,
-  }).format(amount);
+  return (hasCents ? DOLLARS_AND_CENTS : DOLLARS).format(amount);
 }
 
 export function formatPercent(value: number): string {
@@ -48,22 +58,21 @@ export function formatPercent(value: number): string {
  */
 const DATE_PARTS = { month: "2-digit", day: "2-digit", year: "numeric" } as const;
 const TIME_PARTS = { hour: "2-digit", minute: "2-digit", hour12: true } as const;
+const DATE_FORMAT = new Intl.DateTimeFormat("en-US", DATE_PARTS);
+const TIME_FORMAT = new Intl.DateTimeFormat("en-US", TIME_PARTS);
+const DATE_TIME_FORMAT = new Intl.DateTimeFormat("en-US", { ...DATE_PARTS, ...TIME_PARTS });
 
 export function formatDate(date: string, time?: string, timestamp?: string): string {
-  return new Intl.DateTimeFormat("en-US", DATE_PARTS).format(
-    parseAppDateTime(date, time, timestamp)
-  );
+  return DATE_FORMAT.format(parseAppDateTime(date, time, timestamp));
 }
 
 export function formatTime(date: string, time: string, timestamp?: string): string {
-  return new Intl.DateTimeFormat("en-US", TIME_PARTS).format(
-    parseAppDateTime(date, time, timestamp)
-  );
+  return TIME_FORMAT.format(parseAppDateTime(date, time, timestamp));
 }
 
 export function formatDateTime(date: string, time?: string, timestamp?: string): string {
   const at = parseAppDateTime(date, time ?? "00:00:00", timestamp);
-  return new Intl.DateTimeFormat("en-US", { ...DATE_PARTS, ...TIME_PARTS }).format(at);
+  return DATE_TIME_FORMAT.format(at);
 }
 
 /**

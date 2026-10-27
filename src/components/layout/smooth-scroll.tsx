@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import Lenis from "lenis";
 
@@ -17,20 +17,23 @@ import Lenis from "lenis";
  * long glide you have to wait out turns into a fight with the page. 0.9s of
  * travel reads as weight; 1.6s reads as lag.
  *
- * Touch devices keep the native scroll. Phone browsers already have their own
- * momentum, tuned by the platform and expected by the thumb; overriding it
- * makes a familiar gesture feel wrong, and costs a frame budget the phone
- * would rather spend elsewhere.
+ * Touch devices keep the native scroll, and Lenis is not started there at all.
+ * Phone browsers already have their own momentum, tuned by the platform and
+ * expected by the thumb. And Lenis listens to every touch with a handler that
+ * may cancel it, so the browser had to wait on the page's script before moving
+ * at all: while a new page was being built, a swipe simply stuck.
  *
  * `prefers-reduced-motion` turns the whole thing off — for some people this
  * effect is not styling, it is nausea.
  */
 export function SmoothScroll() {
   const pathname = usePathname();
+  const lenisRef = useRef<Lenis | null>(null);
 
   useEffect(() => {
     const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (still) return;
+    const touchOnly = window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+    if (still || touchOnly) return;
 
     const lenis = new Lenis({
       duration: 0.9,
@@ -41,6 +44,7 @@ export function SmoothScroll() {
       syncTouch: false,
       touchMultiplier: 1.6,
     });
+    lenisRef.current = lenis;
 
     let frame = 0;
     const raf = (time: number) => {
@@ -52,15 +56,19 @@ export function SmoothScroll() {
     return () => {
       cancelAnimationFrame(frame);
       lenis.destroy();
+      lenisRef.current = null;
     };
   }, []);
 
-  // A new screen starts at its top. Lenis keeps its own scroll position, so
-  // without this a short page can open halfway down the one before it. It runs
-  // as the page is put in, before the browser pictures it for the page move;
-  // scrolling after that would slide the new page under its own ripple.
+  // A new screen starts at its top. It runs as the page is put in, before the
+  // browser pictures it for the page move; scrolling after that would slide the
+  // new page under its own ripple. Lenis is told too and stopped where it is:
+  // a glide still running from the last page would otherwise carry on down
+  // this one.
   useLayoutEffect(() => {
-    window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
+    const lenis = lenisRef.current;
+    if (lenis) lenis.scrollTo(0, { immediate: true, force: true });
+    else window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
   }, [pathname]);
 
   return null;

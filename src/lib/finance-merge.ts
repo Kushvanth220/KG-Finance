@@ -119,6 +119,20 @@ function scalar<T>(base: T | undefined, local: T | undefined, remote: T | undefi
   return local;
 }
 
+/** A setting changed as one piece: whichever side changed it, or the later change when both did. */
+function newestSetting<T extends { updatedAt: string }>(
+  base: T | undefined,
+  local: T | undefined,
+  remote: T | undefined
+): T | undefined {
+  if (same(local, remote)) return local;
+  if (!local) return remote;
+  if (!remote) return local;
+  if (same(local, base)) return remote;
+  if (same(remote, base)) return local;
+  return remote.updatedAt > local.updatedAt ? remote : local;
+}
+
 export function mergeFinanceStates(
   base: FinanceState | null,
   local: FinanceState,
@@ -144,6 +158,7 @@ export function mergeFinanceStates(
     greenDotTrackingStartDate: scalar(b?.greenDotTrackingStartDate, local.greenDotTrackingStartDate, remote.greenDotTrackingStartDate),
     flexDeposits: mergeById(b?.flexDeposits, local.flexDeposits, remote.flexDeposits),
     remittances: mergeById(b?.remittances, local.remittances, remote.remittances, { newestFirst: true }),
+    homeLayout: newestSetting(b?.homeLayout, local.homeLayout, remote.homeLayout),
   };
 }
 

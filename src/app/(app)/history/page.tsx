@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Filter, RotateCcw, Trash2 } from "lucide-react";
+import { Filter, RotateCcw, Trash2, Wallet } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { listRow, transition } from "@/lib/motion-presets";
 import { DeletedHistoryCard } from "@/components/history/deleted-history-card";
@@ -29,7 +29,9 @@ import {
   isRefund,
 } from "@/lib/transaction-messages";
 import { forcePushNow, getActiveWorkspaceId } from "@/lib/supabase/sync";
-import { PERSON_LABELS, type Person, type Transaction, type TransactionType } from "@/types";
+import { accountLabel } from "@/lib/accounts";
+import { balancesAfter, type BalanceAfter } from "@/lib/running-balance";
+import { PERSON_LABELS, type Account, type Person, type Transaction, type TransactionType } from "@/types";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
@@ -56,6 +58,29 @@ const typeColors: Record<TransactionType, string> = {
   settlement: "text-feature",
   balance_adjustment: "text-muted",
 };
+
+/** "BofA $541.61 left" — or "Discover $450.00 owed" — for each account a row moved. */
+function LeftAfter({ left, accounts }: { left: BalanceAfter[]; accounts: Map<string, Account> }) {
+  return (
+    <p className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[10px] text-muted tabular-nums">
+      {left.map(({ accountId, balance }) => {
+        const account = accounts.get(accountId);
+        if (!account) return null;
+        const credit = account.type === "credit";
+        return (
+          <span key={accountId} className="inline-flex items-center gap-1">
+            <Wallet className="h-3 w-3 shrink-0" aria-hidden />
+            {accountLabel(account)}
+            <span className={cn("font-semibold", (credit ? balance > 0 : balance < 0) ? "text-negative" : "text-foreground")}>
+              {formatCurrency(balance)}
+            </span>
+            {credit ? "owed" : "left"}
+          </span>
+        );
+      })}
+    </p>
+  );
+}
 
 export default function HistoryPage() {
   return (
@@ -99,8 +124,11 @@ function HistoryPageContent({
   personParam: string | null;
 }) {
 
-  const { transactions, incomeEntries, deletedHistory, deleteTransaction, resetAllData } =
+  const { accounts, transactions, incomeEntries, deletedHistory, deleteTransaction, resetAllData } =
     useFinanceStore();
+  // What each row left in its accounts, worked back from today's balances.
+  const leftAfter = useMemo(() => balancesAfter(accounts, transactions), [accounts, transactions]);
+  const accountsById = useMemo(() => new Map(accounts.map((account) => [account.id, account])), [accounts]);
   // Starting state, from the URL: a highlighted transaction opens whichever
   // list it lives in with the filters wide; a type link opens that filter.
   const [view, setView] = useState<"active" | "deleted">(() => {
@@ -416,6 +444,9 @@ function HistoryPageContent({
                     </span>
                   </div>
                   <p className="font-medium mt-1 text-xs leading-snug">{message}</p>
+                  {leftAfter.has(transaction.id) ? (
+                    <LeftAfter left={leftAfter.get(transaction.id)!} accounts={accountsById} />
+                  ) : null}
                   <ActiveTransactionDetails transaction={transaction} />
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
@@ -425,7 +456,8 @@ function HistoryPageContent({
                       isPositive ? "text-positive" : "text-foreground"
                     )}
                   >
-                    {isPositive ? "+" : "-"}
+                    {/* A move between your own accounts is neither in nor out. */}
+                    {isPositive ? "+" : transaction.type === "transfer" ? "" : "-"}
                     {formatCurrency(Math.abs(transaction.amount))}
                   </span>
                   <button

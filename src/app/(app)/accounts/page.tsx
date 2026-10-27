@@ -3,15 +3,7 @@
 import { useMemo, useState } from "react";
 import { format } from "date-fns";
 import { zonedToday, zonedYesterday } from "@/lib/zoned-date";
-import {
-  Banknote,
-  CreditCard,
-  Pencil,
-  Plus,
-  Trash2,
-  TrendingUp,
-  Wallet,
-} from "lucide-react";
+import { ArrowLeftRight, Pencil, Plus, Trash2, TrendingUp } from "lucide-react";
 import { GlassButton } from "@/components/ui/glass-button";
 import { GlassCard } from "@/components/ui/glass-card";
 import { GlassInput } from "@/components/ui/glass-input";
@@ -19,35 +11,23 @@ import { GlassModal } from "@/components/ui/glass-modal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CompactPageShell } from "@/components/ui/compact-page-shell";
 import { useFinanceStore } from "@/store/finance-store";
-import {
-  getAvailableCredit,
-  getCreditUtilization,
-  getMonthlyIncome,
-  getWeeklyIncome,
-} from "@/lib/calculations";
+import { getMonthlyIncome, getWeeklyIncome } from "@/lib/calculations";
 import { AnimatedMoney } from "@/components/ui/animated-number";
-import { formatCurrency, formatDateTime, formatPercent } from "@/lib/formatters";
-import { getAccountsForPerson, isSharedAccount } from "@/lib/accounts";
-import { SharedAccountActivity } from "@/components/accounts/shared-account-activity";
+import { formatCurrency, formatDateTime } from "@/lib/formatters";
+import { getAccountsForPerson, getGreenDotParts, isGreenDotPart } from "@/lib/accounts";
 import { AccountEditor } from "@/components/accounts/account-editor";
-import { Tilt3D } from "@/components/art/tilt-3d";
-import { BankCardFace } from "@/components/art/page-art";
-import { Wallet as WalletIcon, CreditCard as CreditCardIcon } from "lucide-react";
+import { SelfTransferSheet } from "@/components/accounts/self-transfer-sheet";
+import { WalletStack } from "@/components/accounts/wallet-stack";
 import { roundMoney } from "@/lib/money";
 import { CREDIT_LABELS } from "@/lib/settlement";
 import { type Account, type Person } from "@/types";
 import { cn } from "@/lib/utils";
 
-const typeIcons = {
-  credit: CreditCard,
-  debit: Wallet,
-  cash: Banknote,
-};
-
 export default function AccountsPage() {
   const {
     accounts,
     debts,
+    transactions,
     incomeSources,
     incomeEntries,
     adjustAccountBalance,
@@ -79,6 +59,8 @@ export default function AccountsPage() {
   const [depositDate, setDepositDate] = useState(zonedToday());
   // Creating a card used to be possible only by asking the assistant.
   const [accountEditor, setAccountEditor] = useState<{ account?: Account } | null>(null);
+  // A self transfer in progress, starting from this account when one is named.
+  const [transfer, setTransfer] = useState<{ from?: string } | null>(null);
 
   const [sourceName, setSourceName] = useState("");
   const [editSourceId, setEditSourceId] = useState<string | null>(null);
@@ -92,6 +74,13 @@ export default function AccountsPage() {
   const [blockedMessage, setBlockedMessage] = useState<string | null>(null);
 
   const personAccounts = getAccountsForPerson(accounts, person);
+  // The Green Dot card shows on both tabs, standing on this person's part —
+  // or, when they have none, on the other's, so the card is never missing.
+  const greenDotParts = useMemo(() => getGreenDotParts(accounts), [accounts]);
+  const stackAccounts =
+    greenDotParts.length === 0 || personAccounts.some(isGreenDotPart)
+      ? personAccounts
+      : [...personAccounts, greenDotParts[0]!];
   const personSources = incomeSources.filter((s) => s.person === person);
   const personEntries = useMemo(
     () =>
@@ -116,6 +105,20 @@ export default function AccountsPage() {
     setEditAccount(null);
     setNewBalance("");
     setNewLimit("");
+    setAdjustNotes("");
+  };
+
+  const openDeposit = (account: Account) => {
+    setDepositAccount(account);
+    setDepositAmount("");
+    setDepositSourceId("");
+    setDepositNotes("");
+  };
+
+  const openAdjust = (account: Account) => {
+    setEditAccount(account);
+    setNewBalance(String(account.balance));
+    setNewLimit(String(account.creditLimit ?? ""));
     setAdjustNotes("");
   };
 
@@ -212,48 +215,55 @@ export default function AccountsPage() {
       person={person}
       onPersonChange={setPerson}
       action={
-        <button
-          type="button"
-          onClick={() => setAccountEditor({})}
-          className="inline-flex items-center gap-1 rounded-lg bg-accent px-2.5 py-1.5 text-[11px] font-semibold text-white"
-        >
-          <Plus className="w-3 h-3" /> Add account
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setTransfer({})}
+            className="inline-flex items-center gap-1 rounded-lg glass px-2.5 py-1.5 text-[11px] font-semibold text-accent"
+          >
+            <ArrowLeftRight className="w-3 h-3" /> Self transfer
+          </button>
+          <button
+            type="button"
+            onClick={() => setAccountEditor({})}
+            className="inline-flex items-center gap-1 rounded-lg bg-accent px-2.5 py-1.5 text-[11px] font-semibold text-white"
+          >
+            <Plus className="w-3 h-3" /> Add account
+          </button>
+        </div>
       }
     >
-      {/* Held and owed as two cards — separate, because they point opposite
-          ways and one box would invite the eye to add them. */}
+      {/* What is left once every card is paid, with held and owed named apart:
+          they point opposite ways, so neither is folded into the other unseen. */}
       {(() => {
-        const mine = getAccountsForPerson(accounts, person);
         const sum = (types: string[]) =>
-          roundMoney(mine.filter((a) => types.includes(a.type)).reduce((t, a) => t + a.balance, 0));
+          roundMoney(personAccounts.filter((a) => types.includes(a.type)).reduce((t, a) => t + a.balance, 0));
         const held = sum(["debit", "cash"]);
         const owed = sum(["credit"]);
-        const cards = mine.filter((a) => a.type === "credit").length;
-        const banks = mine.length - cards;
         return (
-          <div className="grid grid-cols-2 gap-2">
-            <Tilt3D max={9}>
-              <BankCardFace
-                label="Available"
-                amount={held}
-                sub={`${banks} ${banks === 1 ? "account" : "accounts"}`}
-                tint="#1f9d4a"
-                icon={<WalletIcon className="h-5 w-5" />}
-              />
-            </Tilt3D>
-            <Tilt3D max={9}>
-              <BankCardFace
-                label="Owed on cards"
-                amount={owed}
-                sub={`${cards} ${cards === 1 ? "card" : "cards"}`}
-                tint="#c9302c"
-                icon={<CreditCardIcon className="h-5 w-5" />}
-              />
-            </Tilt3D>
-          </div>
+          <GlassCard className="!p-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">After every card is paid</p>
+            <AnimatedMoney value={roundMoney(held - owed)} className="block text-3xl font-semibold tabular-nums" />
+            <p className="mt-0.5 text-[11px] tabular-nums">
+              <span className="text-positive">{formatCurrency(held)} held</span>
+              <span className="text-muted"> · </span>
+              <span className="text-negative">{formatCurrency(owed)} owed</span>
+            </p>
+          </GlassCard>
         );
       })()}
+
+      <WalletStack
+        accounts={stackAccounts}
+        greenDotParts={greenDotParts}
+        transactions={transactions}
+        onAddAccount={() => setAccountEditor({})}
+        onAddMoney={openDeposit}
+        onTransfer={(account) => setTransfer({ from: account.id })}
+        onAdjust={openAdjust}
+        onRename={(account) => setAccountEditor({ account })}
+        onDelete={handleDeleteAccount}
+      />
 
       <GlassCard className="!p-3">
         <div className="flex items-center gap-1.5 mb-2">
@@ -314,121 +324,6 @@ export default function AccountsPage() {
           )}
         </div>
       </div>
-
-      {(["credit", "debit", "cash"] as const).map((type) => {
-        const typeAccounts = personAccounts.filter((a) => a.type === type);
-        if (typeAccounts.length === 0) return null;
-        const Icon = typeIcons[type];
-        const typeLabel =
-          type === "credit" ? "Credit Cards" : type === "debit" ? "Debit Accounts" : "Cash";
-
-        return (
-          <div key={type} className="space-y-1.5">
-            <h3 className="text-[10px] font-semibold text-muted flex items-center gap-1.5 px-1 uppercase tracking-wide">
-              <Icon className="w-3 h-3" /> {typeLabel}
-            </h3>
-            {typeAccounts.map((account) => (
-              <GlassCard key={account.id} className="!p-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-semibold flex items-center gap-1.5 flex-wrap">
-                      {account.name}
-                      {isSharedAccount(account) ? (
-                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-feature/15 text-feature">
-                          Shared
-                        </span>
-                      ) : null}
-                    </p>
-                    {isSharedAccount(account) ? (
-                      <p className="text-[10px] text-muted">Both of you use this account</p>
-                    ) : null}
-                    {account.type === "credit" && account.creditLimit != null && (
-                      <p className="text-xs text-muted">
-                        Limit: {formatCurrency(account.creditLimit)}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex gap-1">
-                    {(account.type === "debit" || account.type === "cash") && (
-                      <GlassButton
-                        size="sm"
-                        onClick={() => {
-                          setDepositAccount(account);
-                          setDepositAmount("");
-                          setDepositSourceId("");
-                          setDepositNotes("");
-                        }}
-                      >
-                        <Plus className="w-3 h-3" /> Add money
-                      </GlassButton>
-                    )}
-                    <button
-                      onClick={() => setAccountEditor({ account })}
-                      aria-label={`Edit ${account.name}`}
-                      title={`Rename ${account.name}`}
-                      className="tap-icon focus-ring p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5"
-                    >
-                      <Pencil className="w-3.5 h-3.5 text-muted" />
-                    </button>
-                    <button
-                      onClick={() => {
-                        setEditAccount(account);
-                        setNewBalance(String(account.balance));
-                        setNewLimit(String(account.creditLimit ?? ""));
-                        setAdjustNotes("");
-                      }}
-                      className="tap-icon focus-ring p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5"
-                      title={account.type === "credit" ? "Update balance" : "Adjust balance"}
-                    >
-                      <Pencil className="w-4 h-4 text-muted" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteAccount(account)}
-                      className="tap-icon focus-ring p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5"
-                      aria-label={`Delete account ${account.name}`}
-                      title={`Delete ${account.name}`}
-                    >
-                      <Trash2 className="w-4 h-4 text-negative" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex items-end justify-between">
-                  <div>
-                    <p className="text-xs text-muted">
-                      {account.type === "credit" ? CREDIT_LABELS.cardBalance : "Balance"}
-                    </p>
-                    <AnimatedMoney value={account.balance} className="block text-2xl font-bold kg-figure" />
-                  </div>
-                  {account.type === "credit" && account.creditLimit != null && (
-                    <div className="text-right">
-                      <p className="text-xs text-muted">{CREDIT_LABELS.leftToSpend}</p>
-                      <p className="font-semibold text-positive">
-                        {formatCurrency(getAvailableCredit(account))}
-                      </p>
-                      <div className="mt-2 w-24 h-1.5 rounded-full bg-black/10 dark:bg-white/10 overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-accent transition-all"
-                          style={{
-                            width: `${Math.min(100, getCreditUtilization(account))}%`,
-                          }}
-                        />
-                      </div>
-                      <p className="text-[10px] text-muted mt-0.5">
-                        {formatPercent(getCreditUtilization(account))} {CREDIT_LABELS.percentUsed}
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {isSharedAccount(account) ? (
-                  <SharedAccountActivity accountId={account.id} accountName={account.name} />
-                ) : null}
-              </GlassCard>
-            ))}
-          </div>
-        );
-      })}
 
       <div className="glass rounded-xl overflow-hidden">
         <div className="px-3 py-2 border-b border-black/5 dark:border-white/10">
@@ -664,6 +559,10 @@ export default function AccountsPage() {
           </GlassButton>
         </div>
       </GlassModal>
+
+      {transfer ? (
+        <SelfTransferSheet person={person} fromAccountId={transfer.from} onClose={() => setTransfer(null)} />
+      ) : null}
     </CompactPageShell>
   );
 }

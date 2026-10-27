@@ -29,7 +29,6 @@ import {
   type ExpenseShares,
 } from "@/lib/transaction-reversal";
 import { buildDeletedHistoryRecord } from "@/lib/deleted-history";
-import { applySharedAccountNormalization } from "@/lib/accounts";
 import { celebrateBalanceUpdate } from "@/lib/balance-celebration";
 import { clearPersistedAppData, FINANCE_STORAGE_KEY } from "@/lib/reset-app-data";
 import { parseAppDateTime } from "@/lib/formatters";
@@ -49,6 +48,8 @@ import type {
   TransactionType,
 } from "@/types";
 import { cleanDraft, type RemittanceDraft } from "@/lib/remittances";
+import { applyTransfer, buildTransferMessage } from "@/lib/self-transfer";
+import { roundMoney } from "@/lib/money";
 
 interface SpendOptions {
   person: Person;
@@ -115,6 +116,12 @@ interface FinanceActions {
   updateRemittance: (id: string, draft: RemittanceDraft) => void;
   deleteRemittance: (id: string) => void;
 
+  /** Home's card layout, shared with every device. */
+  setHomeLayout: (layout: Omit<import("@/types").HomeLayout, "updatedAt">) => void;
+
+  /** The day (yyyy-MM-dd) the Green Dot panel counts from. Older rows stay in History. */
+  setGreenDotTrackingStartDate: (date: string) => void;
+
   addSpendCategory: (name: string, keywords?: string[]) => void;
   updateSpendCategory: (id: string, updates: Partial<import("@/types").SpendCategory>) => void;
   deleteSpendCategory: (id: string) => void;
@@ -154,6 +161,21 @@ interface FinanceActions {
     notes: string;
   }) => void;
   updateSettlementBalance: (amount: number) => void;
+
+  /**
+   * Own money from one account to another (cash into the bank, the bank onto a card).
+   * Not spending: two balances move and one History row says so. Returns that row's id,
+   * or null when the move can't be made.
+   */
+  transferBetweenAccounts: (options: {
+    person: Person;
+    fromAccountId: string;
+    toAccountId: string;
+    amount: number;
+    notes?: string;
+    /** Day it happened (yyyy-MM-dd). Today when absent. */
+    date?: string;
+  }) => string | null;
 
   deleteTransaction: (id: string, deletedBy: Person) => void;
   resetAllData: () => void;
@@ -437,6 +459,10 @@ export const useFinanceStore = create<FinanceStore>()(
 
       deleteRemittance: (id) =>
         set((state) => ({ remittances: (state.remittances ?? []).filter((record) => record.id !== id) })),
+
+      setHomeLayout: (layout) => set({ homeLayout: { ...layout, updatedAt: new Date().toISOString() } }),
+
+      setGreenDotTrackingStartDate: (date) => set({ greenDotTrackingStartDate: date }),
 
       deleteIncome: (id, deletedBy) =>
         set((state) => {
@@ -1383,6 +1409,38 @@ export const useFinanceStore = create<FinanceStore>()(
           };
         }),
 
+      transferBetweenAccounts: ({ person, fromAccountId, toAccountId, amount, notes, date }) => {
+        let writtenId: string | null = null;
+        set((state) => {
+          const money = roundMoney(amount);
+          const moved = applyTransfer(state.accounts, state.debts, fromAccountId, toAccountId, money);
+          const from = state.accounts.find((a) => a.id === fromAccountId);
+          const to = state.accounts.find((a) => a.id === toAccountId);
+          if (!moved || !from || !to) return state;
+          const transaction = createTransaction(
+            "transfer",
+            person,
+            money,
+            {
+              accountId: fromAccountId,
+              sourceAccountId: fromAccountId,
+              targetAccountId: toAccountId,
+              paymentMethod: `${from.name} → ${to.name}`,
+              autoMessage: buildTransferMessage({ person, amount: money, from: from.name, to: to.name }),
+              notes: notes?.trim() || undefined,
+            },
+            partsForDate(date)
+          );
+          writtenId = transaction.id;
+          return {
+            accounts: moved.accounts,
+            debts: moved.debts,
+            transactions: [transaction, ...state.transactions],
+          };
+        });
+        return writtenId;
+      },
+
       deleteTransaction: (id, deletedBy) =>
         set((state) => {
           const result = applyTransactionDeletion({
@@ -1436,23 +1494,6 @@ export const useFinanceStore = create<FinanceStore>()(
           state.spendCategories = DEFAULT_SPEND_CATEGORIES.map((category) => ({ ...category }));
         }
 
-        const normalized = applySharedAccountNormalization({
-          accounts: state.accounts,
-          incomeEntries: state.incomeEntries,
-          transactions: state.transactions,
-          incomeSources: state.incomeSources,
-          spendCategories: state.spendCategories,
-          monthlyExpenses: state.monthlyExpenses,
-          debts: state.debts,
-          settlementHistory: state.settlementHistory,
-          settlementBalance: state.settlementBalance,
-          deletedHistory: state.deletedHistory,
-        });
-
-        state.accounts = normalized.accounts;
-        state.incomeEntries = normalized.incomeEntries;
-        state.transactions = normalized.transactions;
-
         const baseline = ensureSettlementBaseline(
           state.settlementHistory,
           state.settlementBalance
@@ -1493,23 +1534,23 @@ export function getFinanceState(): FinanceState {
     greenDotTrackingStartDate: state.greenDotTrackingStartDate,
     flexDeposits: state.flexDeposits ?? [],
     remittances: state.remittances ?? [],
+    ...(state.homeLayout ? { homeLayout: state.homeLayout } : {}),
   };
 }
 
 export function applyRemoteFinanceState(state: FinanceState) {
-  const normalized = applySharedAccountNormalization(state);
-  const baseline = ensureSettlementBaseline(
-    normalized.settlementHistory,
-    normalized.settlementBalance
-  );
+  // The cloud's copy is taken as it is. The two Green Dot parts in particular
+  // stay two accounts — see isGreenDotPart — so a pull never rewrites anything
+  // and never marks itself as a change to push back.
+  const baseline = ensureSettlementBaseline(state.settlementHistory, state.settlementBalance);
   const synced = recalculateSettlementState(baseline.settlementHistory);
 
   useFinanceStore.setState({
-    ...normalized,
-    spendCategories: normalized.spendCategories?.length
-      ? normalized.spendCategories
+    ...state,
+    spendCategories: state.spendCategories?.length
+      ? state.spendCategories
       : DEFAULT_SPEND_CATEGORIES.map((category) => ({ ...category })),
-    deletedHistory: normalized.deletedHistory ?? [],
+    deletedHistory: state.deletedHistory ?? [],
     settlementHistory: synced.settlementHistory,
     settlementBalance: synced.settlementBalance,
   });

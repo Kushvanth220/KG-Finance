@@ -28,6 +28,10 @@ interface RowCounts {
   bills: number;
   flexDeposits: number;
   remittances: number;
+  /** Own money moved between own accounts (transactions of type "transfer"). */
+  selfTransfers: number;
+  /** When Home's card layout was last changed, or null when none is saved. */
+  homeLayoutAt: string | null;
 }
 
 /** Last counts, and the stamps they were counted from. */
@@ -82,12 +86,13 @@ export async function GET() {
 
       rows = (data ?? []).map((row) => {
         const doc = (row.data ?? {}) as {
-          transactions?: unknown[];
+          transactions?: Array<{ type?: string }>;
           incomeEntries?: unknown[];
           accounts?: unknown[];
           monthlyExpenses?: unknown[];
           flexDeposits?: unknown[];
           remittances?: unknown[];
+          homeLayout?: { updatedAt?: string };
         };
         return {
           workspace_id: row.workspace_id,
@@ -98,6 +103,8 @@ export async function GET() {
           bills: doc.monthlyExpenses?.length ?? 0,
           flexDeposits: doc.flexDeposits?.length ?? 0,
           remittances: doc.remittances?.length ?? 0,
+          selfTransfers: doc.transactions?.filter((t) => t?.type === "transfer").length ?? 0,
+          homeLayoutAt: typeof doc.homeLayout?.updatedAt === "string" ? doc.homeLayout.updatedAt : null,
         };
       });
       counted = { key: currentKey, rows };

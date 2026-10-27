@@ -804,6 +804,9 @@ export function subscribeToFinanceChanges(
         notifyStatus("error", helpfulErrorMessage(err));
       });
     })
+    .on("broadcast", { event: REMINDERS_EVENT }, () => {
+      for (const listener of remindersListeners) listener();
+    })
     .subscribe((status) => {
       if (status === "CHANNEL_ERROR") {
         notifyStatus("error", "Live sync unavailable — checking every few seconds instead");
@@ -819,6 +822,27 @@ function announceStamp(updatedAt: string) {
   void realtimeChannel
     .send({ type: "broadcast", event: STAMP_EVENT, payload: { updated_at: updatedAt } })
     .catch(() => {});
+}
+
+/**
+ * Reminders live in their own row, but ride the same channel: a device that
+ * saved them says so, and every other one open pulls them at once.
+ */
+const REMINDERS_EVENT = "reminders-changed";
+const remindersListeners = new Set<() => void>();
+
+/** Another device saved its reminders. Returns the unsubscribe. */
+export function onRemindersChanged(listener: () => void) {
+  remindersListeners.add(listener);
+  return () => {
+    remindersListeners.delete(listener);
+  };
+}
+
+/** Tell the other devices this one saved its reminders. Best effort; their checks cover a miss. */
+export function announceRemindersChanged() {
+  if (!realtimeChannel) return;
+  void realtimeChannel.send({ type: "broadcast", event: REMINDERS_EVENT, payload: {} }).catch(() => {});
 }
 
 export function startPollingSync(

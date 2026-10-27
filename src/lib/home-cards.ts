@@ -1,10 +1,10 @@
 /**
  * Which cards Home's deck shows, and in what order.
  *
- * A viewing choice, kept per device like the chart shapes: each phone can lay
- * Home out its own way. The order always names every card, including ones a
- * person doesn't have (Flex on G's tab, Debts with none), so rearranging on one
- * tab never loses where the others sit.
+ * Kept in the workspace record, so a layout set on one device shows on all of
+ * them. The order always names every card, including ones a person doesn't
+ * have (Flex on G's tab, Debts with none), so rearranging on one tab never
+ * loses where the others sit.
  */
 
 export type HomeCardId = "flex" | "income" | "spending" | "accounts" | "debts";
@@ -28,16 +28,25 @@ export const DEFAULT_CARD_PREFS: HomeCardPrefs = { order: ALL, hidden: [] };
 const isCard = (value: unknown): value is HomeCardId => ALL.includes(value as HomeCardId);
 
 /** Saved prefs, made whole: unknown ids dropped, cards added since appended in their usual place. */
+export function normalizeCardPrefs(data: { order?: unknown; hidden?: unknown }): HomeCardPrefs {
+  const order = Array.isArray(data.order) ? [...new Set(data.order.filter(isCard))] : [];
+  const hidden = Array.isArray(data.hidden) ? [...new Set(data.hidden.filter(isCard))] : [];
+  return { order: [...order, ...ALL.filter((id) => !order.includes(id))], hidden };
+}
+
+/** The same, from stored text. */
 export function parseCardPrefs(raw: string | null): HomeCardPrefs {
   if (!raw) return DEFAULT_CARD_PREFS;
   try {
-    const data = JSON.parse(raw) as { order?: unknown; hidden?: unknown };
-    const order = Array.isArray(data.order) ? [...new Set(data.order.filter(isCard))] : [];
-    const hidden = Array.isArray(data.hidden) ? [...new Set(data.hidden.filter(isCard))] : [];
-    return { order: [...order, ...ALL.filter((id) => !order.includes(id))], hidden };
+    return normalizeCardPrefs(JSON.parse(raw) as { order?: unknown; hidden?: unknown });
   } catch {
     return DEFAULT_CARD_PREFS;
   }
+}
+
+/** The layout Home starts with: every card, in the usual order, none hidden. */
+export function isDefaultCardPrefs(prefs: HomeCardPrefs): boolean {
+  return prefs.hidden.length === 0 && prefs.order.every((id, index) => id === ALL[index]);
 }
 
 /** The cards to show, in order: those this person has, minus the hidden ones. */

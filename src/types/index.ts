@@ -257,6 +257,17 @@ export interface FinanceState {
   flexDeposits?: FlexDeposit[];
   /** Money sent abroad; absent on records from before this existed. */
   remittances?: Remittance[];
+  /** Home's card deck as laid out on any device; absent until someone edits it. */
+  homeLayout?: HomeLayout;
+}
+
+/** Which Home cards show, in what order, and how the chart cards draw. Shared by every device. */
+export interface HomeLayout {
+  order: string[];
+  hidden: string[];
+  charts?: { income?: string; spend?: string };
+  /** When it was last changed: the newer layout wins when two devices both edited it. */
+  updatedAt: string;
 }
 
 export const PERSON_LABELS: Record<Person, string> = {

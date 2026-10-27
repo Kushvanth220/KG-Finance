@@ -11,7 +11,7 @@ import { AccountBalances } from "@/components/dashboard/account-balances";
 import { FlexChart, chartColor } from "@/components/charts/flex-chart";
 import { GlassCard } from "@/components/ui/glass-card";
 import { PersonTabs } from "@/components/ui/person-tabs";
-import { ChartTypePicker, useChartType } from "@/components/dashboard/chart-type-picker";
+import { ChartTypePicker } from "@/components/dashboard/chart-type-picker";
 import { ExpenseCategoryDonutChart, IncomeDonutChart } from "@/components/dashboard/dashboard-charts";
 import { SpendCategoryManager } from "@/components/spend/spend-category-manager";
 import { AddIncomeSheet } from "@/components/income/add-income-sheet";
@@ -26,7 +26,7 @@ import {
 } from "@/lib/calculations";
 import { NeedsYou } from "@/components/dashboard/needs-you";
 import { HomeDeck, type DeckCard } from "@/components/dashboard/home-deck";
-import { HomeCardsEditor, useHomeCards } from "@/components/dashboard/home-cards-editor";
+import { HomeCardsEditor, useHomeCards, useHomeChart } from "@/components/dashboard/home-cards-editor";
 import { arrangeCards, type HomeCardId } from "@/lib/home-cards";
 import { MoneyStory } from "@/components/dashboard/money-story";
 import { FlexWeekCard } from "@/components/dashboard/flex-week-card";
@@ -154,8 +154,8 @@ export function DashboardView() {
   const [editingCards, setEditingCards] = useState(false);
   const [unusedOpen, setUnusedOpen] = useState(false);
   // How each panel is drawn — a viewing preference kept per browser.
-  const [incomeChart, setIncomeChart] = useChartType("income", "donut");
-  const [spendChart, setSpendChart] = useChartType("spend", "bar");
+  const [incomeChart, setIncomeChart] = useHomeChart("income");
+  const [spendChart, setSpendChart] = useHomeChart("spend");
 
   // One date filter for the whole page.
   const [rangeChoice, setRangeChoice] = useState<RangeChoice>(defaultRangeChoice);

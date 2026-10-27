@@ -12,28 +12,37 @@
 
 export const APP_TIME_ZONE = process.env.NEXT_PUBLIC_TIME_ZONE || "America/Chicago";
 
-/** yyyy-MM-dd in the workspace's timezone. */
+// Each formatter is made once, on first use: "today" is asked for hundreds of
+// times as a page is drawn, and building a formatter costs far more than using one.
+let clockFormat: Intl.DateTimeFormat | null = null;
+let dayFormat: Intl.DateTimeFormat | null = null;
+let wallFormat: Intl.DateTimeFormat | null = null;
+let longFormat: Intl.DateTimeFormat | null = null;
+
 /** The workspace's wall clock right now, as "HH:MM" (24h), for time fields. */
 export function zonedClockNow(now: Date = new Date()): string {
-  const parts = new Intl.DateTimeFormat("en-US", {
+  clockFormat ??= new Intl.DateTimeFormat("en-US", {
     timeZone: APP_TIME_ZONE,
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
-  }).formatToParts(now);
+  });
+  const parts = clockFormat.formatToParts(now);
   const hour = parts.find((p) => p.type === "hour")?.value ?? "00";
   const minute = parts.find((p) => p.type === "minute")?.value ?? "00";
   return `${hour === "24" ? "00" : hour}:${minute}`;
 }
 
+/** yyyy-MM-dd in the workspace's timezone. */
 export function zonedToday(now: Date = new Date()): string {
   // en-CA formats as yyyy-MM-dd, which is exactly the shape stored on records.
-  return new Intl.DateTimeFormat("en-CA", {
+  dayFormat ??= new Intl.DateTimeFormat("en-CA", {
     timeZone: APP_TIME_ZONE,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).format(now);
+  });
+  return dayFormat.format(now);
 }
 
 /** yyyy-MM-dd for the day before, in the workspace's timezone. */
@@ -53,7 +62,7 @@ export function zonedMonth(now: Date = new Date()): string {
  * against this, so 6:30 means 6:30 here rather than 6:30 in London.
  */
 export function zonedWallClock(now: Date = new Date()): Date {
-  const parts = new Intl.DateTimeFormat("en-US", {
+  wallFormat ??= new Intl.DateTimeFormat("en-US", {
     timeZone: APP_TIME_ZONE,
     year: "numeric",
     month: "2-digit",
@@ -62,18 +71,20 @@ export function zonedWallClock(now: Date = new Date()): Date {
     minute: "2-digit",
     second: "2-digit",
     hour12: false,
-  }).formatToParts(now);
+  });
+  const parts = wallFormat.formatToParts(now);
   const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0);
   return new Date(get("year"), get("month") - 1, get("day"), get("hour") % 24, get("minute"), get("second"));
 }
 
 /** "Wednesday, September 2, 2026" — for reading aloud. */
 export function zonedLongDate(now: Date = new Date()): string {
-  return new Intl.DateTimeFormat("en-US", {
+  longFormat ??= new Intl.DateTimeFormat("en-US", {
     timeZone: APP_TIME_ZONE,
     weekday: "long",
     month: "long",
     day: "numeric",
     year: "numeric",
-  }).format(now);
+  });
+  return longFormat.format(now);
 }

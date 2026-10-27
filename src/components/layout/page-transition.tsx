@@ -17,7 +17,7 @@ import { useReducedMotion } from "motion/react";
  * In Chrome it runs on the browser's view transitions: React names the old and
  * the new page, the browser keeps a picture of the old one, and the two
  * pictures are animated here by name. Everywhere else, including every iPhone
- * browser, the live page does the same move by itself (see picturesWork). Both pages are see-through over the shared
+ * browser, the live page does a lighter move of its own (see rippleLive). Both pages are see-through over the shared
  * background, so the circle is the only boundary. Inside it is the new page;
  * outside it, the old page with the same circle cut out of it. The new picture
  * is live, so the cards being dealt show through it. The ripple waits for the
@@ -255,24 +255,55 @@ function rippleOut(name: string) {
   };
 }
 
+// The live ripple's ring is drawn this big and scaled up: a full-screen layer would cost a phone
+// tens of megabytes of graphics memory for a soft blur nobody can tell apart.
+const RING_PX = 200;
+// The live version deals fewer cards: each one moving is a layer the phone has to keep.
+const LIVE_MAX_CARDS = 6;
+
 /**
- * The same move without pictures, on the live page: it grows out of the touch
- * over the shared background while its cards are dealt in. The old page is
- * simply gone. Used where the picture version is not dependable.
+ * The same move without pictures, on the live page: a ring of light spreads
+ * from the touch while the new page fades up and its cards are dealt in as the
+ * ring reaches them. The old page is simply gone. Used where the picture
+ * version is not dependable.
+ *
+ * Everything here moves by opacity and transform, which the phone animates on
+ * its own, apart from the page's script. A circle cut out of the page (as the
+ * picture version does) has to be repainted by the page itself every frame,
+ * and on an iPhone that stalled while the new page was still being built.
  */
 function rippleLive(page: HTMLElement) {
   const { x, y } = origin();
   const reach = reachFrom(x, y);
-  const box = page.getBoundingClientRect();
-  const at = `${x - box.left}px ${y - box.top}px`;
-  const ripple = page.animate(
-    [{ clipPath: `circle(0px at ${at})` }, { clipPath: `circle(${reach}px at ${at})` }],
-    { duration: RIPPLE_MS, easing: RIPPLE_EASE, fill: "backwards" }
+  // Opacity only on the page: a transform there would trap anything fixed inside it.
+  const fade = page.animate([{ opacity: 0 }, { opacity: 1 }], {
+    duration: 260,
+    easing: "cubic-bezier(0.2, 0.8, 0.2, 1)",
+    fill: "backwards",
+  });
+  const ring = document.createElement("div");
+  ring.className = "kg-ripple";
+  ring.setAttribute("aria-hidden", "true");
+  ring.style.left = `${x - RING_PX / 2}px`;
+  ring.style.top = `${y - RING_PX / 2}px`;
+  document.body.appendChild(ring);
+  const wave = ring.animate(
+    [
+      { transform: "scale(0)", opacity: 1 },
+      { transform: `scale(${(2 * reach) / RING_PX})`, opacity: 0 },
+    ],
+    { duration: RIPPLE_MS, easing: RIPPLE_EASE, fill: "both" }
   );
-  const cards = cardsOf(page);
+  const clear = () => ring.remove();
+  wave.finished.then(clear, clear);
+  const cards = cardsOf(page).slice(0, LIVE_MAX_CARDS);
   cards.forEach((card) => (card.dataset.dealt = ""));
   deal(cards, x, y, reach);
-  return () => ripple.cancel();
+  return () => {
+    fade.cancel();
+    wave.cancel();
+    clear();
+  };
 }
 
 // A view-transition name for a route: "/" is kg-page-home, "/flex" kg-page-flex.

@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { AnimatePresence } from "motion/react";
 import { useAssistantPreferencesStore } from "@/store/assistant-preferences-store";
 import { pendingRing, rings, type Reminder } from "@/lib/ai/reminders";
+import { onRemindersChanged } from "@/lib/supabase/sync";
 import { RingScreen } from "@/components/alarm/ring-screen";
 
 /**
@@ -15,7 +16,8 @@ import { RingScreen } from "@/components/alarm/ring-screen";
  * notification opens the app with `?ring=<id>`, and a push that arrives while
  * the app is open is passed on by the service worker. Done and Snooze from a
  * notification's buttons are saved on the server, so the reminders are pulled
- * again whenever the app comes back to the front.
+ * again whenever the app comes back to the front — and the moment another
+ * device says it saved some, with a check every 30 seconds behind that.
  */
 
 const ALARM_WINDOW = 2 * 3_600_000;
@@ -40,12 +42,13 @@ export function AlarmRinger() {
     const tick = window.setInterval(() => setNow(new Date()), 15_000);
     const pull = window.setInterval(() => {
       if (document.visibilityState === "visible") hydrate();
-    }, 120_000);
+    }, 30_000);
     const onVisible = () => {
       if (document.visibilityState !== "visible") return;
       setNow(new Date());
       hydrate();
     };
+    const stopListening = onRemindersChanged(hydrate);
     const onMessage = (event: MessageEvent) => {
       const data = event.data as { type?: string; id?: string } | null;
       if (data?.type === "kg-ring" && data.id) {
@@ -60,6 +63,7 @@ export function AlarmRinger() {
     return () => {
       window.clearInterval(tick);
       window.clearInterval(pull);
+      stopListening();
       document.removeEventListener("visibilitychange", onVisible);
       navigator.serviceWorker?.removeEventListener("message", onMessage);
     };

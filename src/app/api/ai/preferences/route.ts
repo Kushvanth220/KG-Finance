@@ -4,7 +4,8 @@ import {
   storedReminders,
   upsertAssistantPreferences,
 } from "@/lib/ai/chat-store";
-import { newerReminder, reminderFromLegacyLine, type Reminder } from "@/lib/ai/reminders";
+import { reminderFromLegacyLine, type Reminder } from "@/lib/ai/reminders";
+import { mergeReminderLists, mergeTombstones, type ReminderTombstones } from "@/lib/ai/reminder-sync";
 
 export const dynamic = "force-dynamic";
 
@@ -16,8 +17,10 @@ interface PreferencesBody {
   behavior_instructions?: string[];
   /** Sentences only: what clients sent before reminders travelled as data. */
   reminders?: string[];
-  /** Reminders as data. When present, this is the list. */
+  /** The device's reminders as data. Merged with the saved ones, never a replacement. */
   reminder_data?: Reminder[];
+  /** Reminders the device deleted, and when. */
+  reminder_deleted?: ReminderTombstones;
   append_behavior_instruction?: string;
   append_reminder?: string;
 }
@@ -53,21 +56,26 @@ export async function POST(request: Request) {
 
     let reminders: Parameters<typeof upsertAssistantPreferences>[0]["reminders"];
     if (Array.isArray(body.reminder_data)) {
-      // The device sends its whole list. Per reminder, a copy changed here
-      // more recently (a Done or Snooze tapped on a notification) beats the
-      // device's older one, and "done through" never moves back.
-      const saved = new Map((existing?.reminder_data ?? []).map((item) => [item.id, item]));
-      let list = body.reminder_data.filter(isReminder).map((incoming) => {
-        const { line: _line, ...clean } = incoming as Reminder & { line?: string };
+      // The device sends its whole list, but it is one device of several: one
+      // the device hasn't seen yet (made on another phone) stays, and only a
+      // headstone removes one. Per reminder the newer copy wins — a Done
+      // tapped on a notification beats an older copy — and "done through"
+      // never moves back.
+      const incoming = body.reminder_data.filter(isReminder).map((item) => {
+        const { line: _line, ...clean } = item as Reminder & { line?: string };
         void _line;
-        const old = saved.get(clean.id);
-        return old ? newerReminder(clean, old) : clean;
+        return clean;
       });
+      // Saved copies whose id was made up while reading sentences can't be
+      // matched by id; the device's list already carries them as data.
+      const saved = (existing?.reminder_data ?? []).filter((item) => !item.id.startsWith("legacy-"));
+      const deleted = mergeTombstones(existing?.reminder_deleted, body.reminder_deleted);
+      let list = mergeReminderLists(incoming, saved, deleted);
       if (body.append_reminder?.trim()) {
         const line = body.append_reminder.trim().slice(0, 500);
         list = [...list, reminderFromLegacyLine(line, crypto.randomUUID())];
       }
-      reminders = storedReminders(list);
+      reminders = storedReminders(list, deleted);
     } else {
       let lines = body.reminders ?? existing?.reminders ?? [];
       if (body.append_reminder?.trim()) {

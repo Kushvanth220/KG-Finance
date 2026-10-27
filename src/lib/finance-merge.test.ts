@@ -146,3 +146,28 @@ describe("mergeFinanceStates — money transfers", () => {
     expect(mergeFinanceStates(null, local, remote).remittances?.map((r) => r.id)).toEqual(["mine"]);
   });
 });
+
+describe("mergeFinanceStates — Home layout", () => {
+  const layout = (order: string[], updatedAt: string) => ({ order, hidden: [], updatedAt });
+
+  it("takes the layout from whichever device changed it", () => {
+    const base = state({ homeLayout: layout(["flex", "income"], "2026-10-01T00:00:00.000Z") });
+    const remote = state({ homeLayout: layout(["income", "flex"], "2026-10-02T00:00:00.000Z") });
+    expect(mergeFinanceStates(base, base, remote).homeLayout?.order).toEqual(["income", "flex"]);
+    expect(mergeFinanceStates(base, remote, base).homeLayout?.order).toEqual(["income", "flex"]);
+  });
+
+  it("takes the later layout when both devices changed it", () => {
+    const base = state({ homeLayout: layout(["flex", "income"], "2026-10-01T00:00:00.000Z") });
+    const local = state({ homeLayout: layout(["income", "flex"], "2026-10-03T00:00:00.000Z") });
+    const remote = state({ homeLayout: { ...layout(["flex", "income"], "2026-10-02T00:00:00.000Z"), hidden: ["flex"] } });
+    expect(mergeFinanceStates(base, local, remote).homeLayout?.order).toEqual(["income", "flex"]);
+    expect(mergeFinanceStates(base, remote, local).homeLayout?.order).toEqual(["income", "flex"]);
+  });
+
+  it("keeps a layout when the other side has none yet", () => {
+    const local = state({ homeLayout: layout(["debts"], "2026-10-02T00:00:00.000Z") });
+    expect(mergeFinanceStates(null, local, state()).homeLayout?.order).toEqual(["debts"]);
+    expect(mergeFinanceStates(null, state(), local).homeLayout?.order).toEqual(["debts"]);
+  });
+});

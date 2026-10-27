@@ -3,6 +3,7 @@ import { getAiUserDisplayName } from "@/lib/ai/person";
 import type { FinanceState, Person, Transaction } from "@/types";
 import { zonedMonth, zonedToday } from "@/lib/zoned-date";
 import { OWNER_LABEL, MEMBER_LABEL } from "@/lib/branding";
+import { isGreenDotPart } from "@/lib/accounts";
 
 function transactionBelongsToUser(transaction: Transaction, userId: Person): boolean {
   if (transaction.person === userId) return true;
@@ -74,7 +75,7 @@ export function buildFinanceContextSummary(
   const accountLines = state.accounts
     .map(
       (account) =>
-        `- id=${account.id} | ${account.name} (${account.type}${account.shared ? ", shared" : ""}): $${account.balance.toFixed(2)}`
+        `- id=${account.id} | ${account.name} (${account.type}${account.shared ? ", shared" : ""}${isGreenDotPart(account) ? ", this person's own part of the Green Dot card both use" : ""}): $${account.balance.toFixed(2)}`
     )
     .join("\n");
 

@@ -7,7 +7,7 @@ import { AnimatedMoney } from "@/components/ui/animated-number";
 import { ACCOUNT_TYPE_META } from "@/components/accounts/account-type-meta";
 import { AccountWallet } from "@/components/dashboard/account-wallet";
 import { useFinanceStore } from "@/store/finance-store";
-import { getAccountsForPerson } from "@/lib/accounts";
+import { getAccountsForPerson, getGreenDotCardBalance, isGreenDotPart } from "@/lib/accounts";
 import { roundMoney } from "@/lib/money";
 import { formatCurrency } from "@/lib/formatters";
 import type { Account, AccountType, Person } from "@/types";
@@ -40,7 +40,16 @@ function isPhoneLayout() {
   return window.matchMedia("(max-width: 767px)").matches;
 }
 
-function AccountCard({ account, onOpen }: { account: Account; onOpen: (accountId: string) => void }) {
+function AccountCard({
+  account,
+  cardTotal,
+  onOpen,
+}: {
+  account: Account;
+  /** For a part of the Green Dot card: what the whole card holds. */
+  cardTotal: number | null;
+  onOpen: (accountId: string) => void;
+}) {
   const meta = ACCOUNT_TYPE_META[account.type];
   const Icon = meta.icon;
   const isCard = account.type === "credit";
@@ -67,16 +76,26 @@ function AccountCard({ account, onOpen }: { account: Account; onOpen: (accountId
         <span className="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wide" style={{ color: meta.tint }}>
           <Icon className="h-3 w-3" /> {meta.label}
         </span>
-        {account.shared ? (
+        {account.shared || cardTotal !== null ? (
           <span className="rounded-full bg-cyan/15 px-1.5 py-0.5 text-[8px] font-semibold text-cyan">SHARED</span>
         ) : null}
       </div>
-      <p className="mt-1.5 truncate text-[11px] font-medium">{account.name}</p>
-      <p className={cn("truncate text-[15px] font-semibold tabular-nums", isCard && account.balance > 0 && "text-negative")}>
+      <p className="mt-1.5 truncate text-[11px] font-medium">
+        {account.name}
+        {cardTotal !== null ? <span className="text-muted"> · part</span> : null}
+      </p>
+      <p
+        className={cn(
+          "truncate text-[15px] font-semibold tabular-nums",
+          ((isCard && account.balance > 0) || (cardTotal !== null && account.balance < 0)) && "text-negative"
+        )}
+      >
         {formatCurrency(account.balance)}
       </p>
       {left !== null ? (
         <p className="truncate text-[9px] text-muted tabular-nums">{formatCurrency(left)} left</p>
+      ) : cardTotal !== null ? (
+        <p className="truncate text-[9px] text-muted tabular-nums">of {formatCurrency(cardTotal)} on the card</p>
       ) : null}
     </Link>
   );
@@ -87,7 +106,7 @@ export function AccountBalances({ person }: { person: Person }) {
   const [showAll, setShowAll] = useState(false);
   const [walletAt, setWalletAt] = useState<string | null>(null);
 
-  const { mine, available, owed } = useMemo(() => {
+  const { mine, available, owed, cardTotal } = useMemo(() => {
     const mine = getAccountsForPerson(accounts, person);
     const sumOf = (type: AccountType) =>
       mine.filter((account) => account.type === type).reduce((sum, a) => sum + a.balance, 0);
@@ -95,6 +114,7 @@ export function AccountBalances({ person }: { person: Person }) {
       mine,
       available: roundMoney(sumOf("debit") + sumOf("cash")),
       owed: roundMoney(sumOf("credit")),
+      cardTotal: roundMoney(getGreenDotCardBalance(accounts)),
     };
   }, [accounts, person]);
 
@@ -144,7 +164,12 @@ export function AccountBalances({ person }: { person: Person }) {
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {shown.map((account) => (
-          <AccountCard key={account.id} account={account} onOpen={setWalletAt} />
+          <AccountCard
+            key={account.id}
+            account={account}
+            cardTotal={isGreenDotPart(account) ? cardTotal : null}
+            onOpen={setWalletAt}
+          />
         ))}
       </div>
 
