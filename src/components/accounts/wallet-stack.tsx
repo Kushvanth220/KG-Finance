@@ -1,13 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
 import { ArrowLeftRight, Pencil, Plus, SlidersHorizontal, Trash2 } from "lucide-react";
 import { AnimatedMoney } from "@/components/ui/animated-number";
 import { SharedAccountActivity } from "@/components/accounts/shared-account-activity";
 import { getAvailableCredit, getCreditUtilization } from "@/lib/calculations";
-import { compareByDateTime, formatCurrency, formatDate, formatPercent } from "@/lib/formatters";
+import { compareByDateTime, formatAmount, formatCurrency, formatDate, formatPercent } from "@/lib/formatters";
 import { isSharedAccount } from "@/lib/accounts";
 import { roundMoney } from "@/lib/money";
 import { CREDIT_LABELS } from "@/lib/settlement";
@@ -45,7 +45,7 @@ function faceColors(account: Account, usedByBoth: boolean): [string, string] {
 
 /** The balance as the card's edge says it: money held, or owed on a card. */
 const edgeBalance = (account: Account) =>
-  account.type === "credit" ? `${formatCurrency(account.balance)} owed` : formatCurrency(account.balance);
+  account.type === "credit" ? `${formatAmount(account.balance)} owed` : formatAmount(account.balance);
 
 /** A row's words: what it was, as History would put it in a few words. */
 function rowLabel(transaction: Transaction): string {
@@ -55,7 +55,7 @@ function rowLabel(transaction: Transaction): string {
 
 /** A row's amount from this account's side: in, out, or moved. */
 function rowAmount(transaction: Transaction, accountId: string): { text: string; tone: string } {
-  const money = formatCurrency(Math.abs(transaction.amount));
+  const money = formatAmount(Math.abs(transaction.amount));
   if (transaction.type === "transfer") {
     return { text: `${transaction.targetAccountId === accountId ? "+" : "−"}${money}`, tone: "text-accent" };
   }
@@ -90,6 +90,34 @@ function ActionButton({
 }
 
 const NO_PARTS: Account[] = [];
+
+// Whether $0 accounts are folded away: this phone's choice, folded unless opened.
+const FOLD_KEY = "kg-fold-empty-accounts";
+const foldListeners = new Set<() => void>();
+let foldMemory = true;
+function readFold(): boolean {
+  try {
+    const saved = window.localStorage.getItem(FOLD_KEY);
+    return saved === null ? foldMemory : saved === "1";
+  } catch {
+    return foldMemory;
+  }
+}
+function writeFold(next: boolean) {
+  foldMemory = next;
+  try {
+    window.localStorage.setItem(FOLD_KEY, next ? "1" : "0");
+  } catch {
+    // Remembered for this visit only.
+  }
+  foldListeners.forEach((listener) => listener());
+}
+function subscribeFold(listener: () => void) {
+  foldListeners.add(listener);
+  return () => {
+    foldListeners.delete(listener);
+  };
+}
 
 /** Each person's part of the Green Dot card, on its face; the part these buttons change is lit. */
 function CardParts({ parts, active, still }: { parts: Account[]; active: string; still: boolean }) {
@@ -160,9 +188,16 @@ export function WalletStack({
   const isCardPart = (account: Account) => partIds.has(account.id);
   const usedByBoth = (account: Account) => isSharedAccount(account) || isCardPart(account);
 
-  // A card picked on the other person's tab, or since deleted, falls back to the first.
-  const front = sorted.find((account) => account.id === picked) ?? sorted[0];
-  const stack = front ? [...sorted.filter((account) => account.id !== front.id), front] : [];
+  // Accounts sitting at $0 fold into one line until opened, so the cards in use
+  // aren't pushed down under the tab bar. Never all of them, and never Green Dot.
+  const foldEmpty = useSyncExternalStore(subscribeFold, readFold, () => true);
+  const empty = sorted.filter((account) => Math.abs(account.balance) < 0.005 && !isCardPart(account));
+  const folded = foldEmpty && empty.length > 0 && empty.length < sorted.length;
+  const shown = folded ? sorted.filter((account) => !empty.includes(account)) : sorted;
+
+  // A card picked on the other person's tab, folded away or since deleted, falls back to the first.
+  const front = shown.find((account) => account.id === picked) ?? shown[0];
+  const stack = front ? [...shown.filter((account) => account.id !== front.id), front] : [];
   // The Green Dot card keeps its history in its own panel below, both people together.
   const frontIsCard = front != null && partIds.has(front.id);
 
@@ -195,7 +230,22 @@ export function WalletStack({
 
   return (
     <div className="space-y-3">
-      <div className="relative" style={{ height: (stack.length - 1) * STRIP + CARD_HEIGHT }}>
+      {empty.length > 0 && empty.length < sorted.length ? (
+        <div className="flex items-center justify-between gap-2 px-1 text-[11px] text-muted">
+          <span>
+            {folded
+              ? `${empty.length} account${empty.length === 1 ? "" : "s"} at $0 folded away`
+              : `Showing ${empty.length} account${empty.length === 1 ? "" : "s"} at $0`}
+          </span>
+          <button type="button" onClick={() => writeFold(!folded)} className="font-semibold text-accent">
+            {folded ? "Show" : "Fold away"}
+          </button>
+        </div>
+      ) : null}
+      <div
+        className="relative transition-[height] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]"
+        style={{ height: (stack.length - 1) * STRIP + CARD_HEIGHT }}
+      >
         {stack.map((account, place) => {
           const isFront = account.id === front.id;
           const isCard = isCardPart(account);
@@ -233,7 +283,7 @@ export function WalletStack({
                   ) : null
                 ) : (
                   <span className="shrink-0 text-[14px] font-semibold tabular-nums">
-                    {isCard ? formatCurrency(cardTotal) : edgeBalance(account)}
+                    {isCard ? formatAmount(cardTotal) : edgeBalance(account)}
                   </span>
                 )}
               </div>

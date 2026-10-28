@@ -13,12 +13,13 @@ import { CompactPageShell } from "@/components/ui/compact-page-shell";
 import { useFinanceStore } from "@/store/finance-store";
 import { getMonthlyIncome, getWeeklyIncome } from "@/lib/calculations";
 import { AnimatedMoney } from "@/components/ui/animated-number";
-import { formatCurrency, formatDateTime } from "@/lib/formatters";
+import { formatAmount, formatCurrency, formatDateTime } from "@/lib/formatters";
 import { getAccountsForPerson, getGreenDotParts, isGreenDotPart } from "@/lib/accounts";
 import { AccountEditor } from "@/components/accounts/account-editor";
 import { SelfTransferSheet } from "@/components/accounts/self-transfer-sheet";
 import { WalletStack } from "@/components/accounts/wallet-stack";
 import { roundMoney } from "@/lib/money";
+import { useQuickAction } from "@/lib/quick-actions";
 import { CREDIT_LABELS } from "@/lib/settlement";
 import { type Account, type Person } from "@/types";
 import { cn } from "@/lib/utils";
@@ -61,6 +62,8 @@ export default function AccountsPage() {
   const [accountEditor, setAccountEditor] = useState<{ account?: Account } | null>(null);
   // A self transfer in progress, starting from this account when one is named.
   const [transfer, setTransfer] = useState<{ from?: string } | null>(null);
+  // Press and hold Spend in the tab bar → Self transfer.
+  useQuickAction("transfer", () => setTransfer({}));
 
   const [sourceName, setSourceName] = useState("");
   const [editSourceId, setEditSourceId] = useState<string | null>(null);
@@ -347,7 +350,7 @@ export default function AccountsPage() {
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     <span className="text-xs font-semibold text-positive tabular-nums">
-                      +{formatCurrency(entry.amount)}
+                      +{formatAmount(entry.amount)}
                     </span>
                     <button
                       onClick={() => confirmDeleteIncome(entry)}

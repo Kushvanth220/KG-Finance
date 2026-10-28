@@ -409,7 +409,8 @@ export default function SyncPage() {
             </motion.div>
           ) : null}
 
-          <div className="grid grid-cols-2 gap-2">
+          {/* Held above the tab bar on a phone, where it used to sit underneath it. */}
+          <div data-action-bar className="kg-action-bar sticky bottom-[calc(6.9rem+env(safe-area-inset-bottom))] z-30 grid grid-cols-2 gap-2 md:static">
             <button
               type="button"
               onClick={() => downloadBackup(workspaceId)}

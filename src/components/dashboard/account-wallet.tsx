@@ -11,7 +11,7 @@ import { useFinanceStore } from "@/store/finance-store";
 import { getAvailableCredit, getCreditUtilization } from "@/lib/calculations";
 import { getGreenDotCardBalance, isGreenDotPart } from "@/lib/accounts";
 import { roundMoney } from "@/lib/money";
-import { compareByDateTime, formatCurrency, formatDate, formatPercent } from "@/lib/formatters";
+import { compareByDateTime, formatAmount, formatCurrency, formatDate, formatPercent } from "@/lib/formatters";
 import { isMoneyIn } from "@/lib/transaction-messages";
 import { CREDIT_LABELS } from "@/lib/settlement";
 import type { StackGeometry } from "@/lib/stack-pose";
@@ -139,7 +139,7 @@ function WalletCard({
                   </span>
                   <span className={cn("w-[72px] shrink-0 text-right font-semibold tabular-nums", moneyIn && "text-positive")}>
                     {moneyIn ? "+" : "-"}
-                    {formatCurrency(Math.abs(transaction.amount))}
+                    {formatAmount(Math.abs(transaction.amount))}
                   </span>
                 </li>
               );

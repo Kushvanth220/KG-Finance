@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
-import { ChevronDown, Loader2, Pencil, Plus, Receipt, TrendingUp } from "lucide-react";
+import { ChevronDown, Pencil, Plus, Receipt, TrendingUp } from "lucide-react";
 import { AnimatedMoney } from "@/components/ui/animated-number";
 import { RuleDashboards } from "@/components/dashboard/rule-dashboard";
 import { AccountBalances } from "@/components/dashboard/account-balances";
@@ -27,6 +27,8 @@ import {
 import { NeedsYou } from "@/components/dashboard/needs-you";
 import { HomeDeck, type DeckCard } from "@/components/dashboard/home-deck";
 import { HomeCardsEditor, useHomeCards, useHomeChart } from "@/components/dashboard/home-cards-editor";
+import { useQuickAction } from "@/lib/quick-actions";
+import { HomeSkeleton, useFirstSyncDone } from "@/components/dashboard/home-skeleton";
 import { arrangeCards, type HomeCardId } from "@/lib/home-cards";
 import { MoneyStory } from "@/components/dashboard/money-story";
 import { FlexWeekCard } from "@/components/dashboard/flex-week-card";
@@ -44,7 +46,6 @@ import { formatCurrency } from "@/lib/formatters";
 import { roundMoney } from "@/lib/money";
 import { PERSON_LABELS, type Person } from "@/types";
 import { cn } from "@/lib/utils";
-import { useLiveSync } from "@/hooks/use-live-sync";
 import { SpendGrid } from "@/components/art/page-art";
 import { Reveal } from "@/components/ui/reveal";
 import { UpcomingStrip } from "@/components/dashboard/upcoming-strip";
@@ -145,10 +146,12 @@ export function DashboardView() {
   const assistantName = useAssistantPreferencesStore((state) => state.getAssistantName());
   const debts = useFinanceStore((state) => state.debts);
   const hasFlex = useRulesStore((state) => !!findFlexRule(state.rules));
-  const { configured: syncConfigured, isLive, isSyncing, lastSyncedAt } = useLiveSync();
   const [person, setPerson] = useState<Person>("kushvanth");
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
   const [incomeOpen, setIncomeOpen] = useState(false);
+  // Press and hold Spend in the tab bar → Income.
+  useQuickAction("income", () => setIncomeOpen(true));
+  const firstSyncDone = useFirstSyncDone();
   // The deck's layout (order, hidden cards) for this browser, and its editor.
   const [cardPrefs, setCardPrefs] = useHomeCards();
   const [editingCards, setEditingCards] = useState(false);
@@ -382,6 +385,10 @@ export function DashboardView() {
    */
   const section = (index: number) => ({ delay: index < 3 ? enterDelay(index, 0.06) : 0 });
 
+  // A phone with nothing saved yet waits for the cloud behind placeholders
+  // instead of showing "$0 available" as if it were the answer.
+  if (!firstSyncDone && accounts.length === 0 && transactions.length === 0) return <HomeSkeleton />;
+
   return (
     <motion.div layout={still ? false : "position"} className="space-y-3 pb-4 max-w-lg mx-auto">
       {/* One greeting, one line that matters. Everything below is detail. */}
@@ -403,30 +410,6 @@ export function DashboardView() {
                   </span>
                 </>
               ) : null}
-              {syncConfigured && (
-                <span
-                  className={cn(
-                    "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-semibold",
-                    isLive && !isSyncing
-                      ? "bg-positive/15 text-positive"
-                      : isSyncing
-                        ? "bg-accent/15 text-accent"
-                        : "bg-black/5 text-muted dark:bg-white/10"
-                  )}
-                  title={
-                    lastSyncedAt
-                      ? `Last synced ${format(new Date(lastSyncedAt), "MM/dd/yyyy hh:mm a")}`
-                      : "Waiting for first sync"
-                  }
-                >
-                  {isSyncing ? (
-                    <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                  ) : (
-                    <span className={cn("w-1.5 h-1.5 rounded-full", isLive ? "bg-positive" : "bg-muted")} />
-                  )}
-                  {isSyncing ? "Syncing" : isLive ? "Live" : "Sync"}
-                </span>
-              )}
             </p>
           </div>
         </div>

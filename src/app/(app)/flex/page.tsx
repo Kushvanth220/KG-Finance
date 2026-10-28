@@ -17,7 +17,7 @@ import { resolveEntry } from "@/lib/rules/engine";
 import { ensureFlexRule, FLEX_BLUE } from "@/lib/flex";
 import { zonedToday } from "@/lib/zoned-date";
 import type { RuleEntry } from "@/lib/rules/types";
-import { formatClock, formatCurrency, formatDate, formatShortDate } from "@/lib/formatters";
+import { formatClock, formatCurrency, formatDate, formatLateness, formatShortDate } from "@/lib/formatters";
 import { roundMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { useAssistantName } from "@/store/assistant-preferences-store";
@@ -475,12 +475,17 @@ export default function FlexPage() {
                       </span>
                     </p>
                     <p className="text-[10px] text-muted">
-                      Base {formatCurrency(Number(values.base_pay ?? 0))} · due{" "}
-                      {item.overdueHours}h ago
+                      Base {formatCurrency(Number(values.base_pay ?? 0))} · tip not added yet
                     </p>
                   </div>
-                  <span className="shrink-0 text-[11px] font-semibold" style={{ color: FLEX_BLUE }}>
-                    Add tip
+                  <span className="flex shrink-0 flex-col items-end gap-1">
+                    {/* Days, not hours: "283h" is almost two weeks, and nobody reads it that way. */}
+                    <span className="rounded-full bg-caution/15 px-2 py-0.5 text-[10px] font-semibold text-caution">
+                      {formatLateness(item.overdueHours)}
+                    </span>
+                    <span className="text-[11px] font-semibold" style={{ color: FLEX_BLUE }}>
+                      Add tip
+                    </span>
                   </span>
                 </button>
               );

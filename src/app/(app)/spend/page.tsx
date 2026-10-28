@@ -26,7 +26,10 @@ import { GlassModal } from "@/components/ui/glass-modal";
 import { SelfTransferSheet } from "@/components/accounts/self-transfer-sheet";
 import { useFinanceStore } from "@/store/finance-store";
 import { getAccountsForPerson, isSharedAccount } from "@/lib/accounts";
-import { formatCurrency, parseAppDateTime } from "@/lib/formatters";
+import { formatAmount, formatCurrency, parseAppDateTime } from "@/lib/formatters";
+import { CategoryTypoHint } from "@/components/spend/category-typo-hint";
+import { useQuickAction } from "@/lib/quick-actions";
+import { RollingMoney } from "@/components/spend/rolling-money";
 import {
   matchSpendCategoryFromNote,
   resolveSpendCategoryLabel,
@@ -71,7 +74,13 @@ interface SavedSpend {
   amount: number;
   category: string;
   refund: boolean;
+  /** Each account's balance just before, so the done screen can roll it down to the new one. */
+  before: Record<string, number>;
 }
+
+/** Every account's balance right now, by id. */
+const balancesNow = (): Record<string, number> =>
+  Object.fromEntries(useFinanceStore.getState().accounts.map((account) => [account.id, account.balance]));
 
 const UNDO_SECONDS = 8;
 
@@ -254,6 +263,8 @@ export default function SpendPage() {
     // And the phone's keyboard goes down, so the keypad isn't hidden under it.
     amountRef.current?.blur();
   };
+  // Press and hold Spend in the tab bar → Calculator.
+  useQuickAction("calculator", openCalculator);
 
   const handleNotesChange = (val: string) => {
     setNotes(val);
@@ -368,6 +379,7 @@ export default function SpendPage() {
       Math.abs(expenseShareKushAmt + expenseShareGAmt - parsedAmount) < 0.01);
 
   const sharesValid = paymentSharesValid && expenseSharesValid;
+  const detailsReady = isCategoryValid && parsedAmount > 0 && sharesValid;
 
   const splitRemaining = parsedAmount - kushAmount - gAmount;
   const expenseSplitRemaining = parsedAmount - expenseShareKushAmt - expenseShareGAmt;
@@ -459,8 +471,8 @@ export default function SpendPage() {
 
   const notesToSave = () => notes.trim() || undefined;
 
-  const finish = (ids: string[], accountIds: string[], label: string) => {
-    setSaved({ ids, accountIds, amount: parsedAmount, category: label, refund });
+  const finish = (ids: string[], accountIds: string[], label: string, before: Record<string, number>) => {
+    setSaved({ ids, accountIds, amount: parsedAmount, category: label, refund, before });
     setUndoLeft(UNDO_SECONDS);
     haptic([10, 40, 14]);
     setStep("done");
@@ -489,6 +501,7 @@ export default function SpendPage() {
     if (payments.length === 0) return;
 
     guardDuplicate(label, () => {
+      const before = balancesNow();
       const ids = spendSplit({
         category: label,
         expenseOwner: sharedExpense ? undefined : (expenseOwner as Person),
@@ -497,7 +510,9 @@ export default function SpendPage() {
         payments,
         date: spendDate,
       });
-      finish(ids, payments.map((p) => p.accountId), label);
+      // Cash taken out for it comes from the bank, so the bank is what moved.
+      const moved = payments.flatMap((p) => (p.cashSourceAccountId ? [p.cashSourceAccountId] : [p.accountId]));
+      finish(ids, [...new Set(moved)], label, before);
     });
   };
 
@@ -550,6 +565,7 @@ export default function SpendPage() {
     );
 
     guardDuplicate(label, () => {
+      const before = balancesNow();
       const id = spend({
         person: payer,
         amount: parsedAmount,
@@ -568,7 +584,10 @@ export default function SpendPage() {
         date: spendDate,
         refund,
       });
-      finish(id ? [id] : [], [accountId], label);
+      // Cash taken out for it comes from the bank, so the bank is what moved.
+      const paying = accounts.find((a) => a.id === accountId);
+      const moved = paying?.type === "cash" && cashSourceAccountId ? cashSourceAccountId : accountId;
+      finish(id ? [id] : [], [moved], label, before);
     });
   };
 
@@ -992,16 +1011,33 @@ export default function SpendPage() {
             )}
           </div>
 
-          <GlassButton
-            size="lg"
-            className="w-full"
-            disabled={!isCategoryValid || parsedAmount <= 0 || !sharesValid}
-            onClick={handleDetailsNext}
+          {/* It says what it is about to save, and once there is something to
+              save it is held just above the tab bar on a phone instead of
+              under it. Until then it waits at the end of the form, covering
+              nothing you still have to fill in. */}
+          <div
+            {...(detailsReady ? { "data-action-bar": "" } : {})}
+            className={cn(detailsReady && "kg-action-bar sticky bottom-[calc(6.9rem+env(safe-area-inset-bottom))] z-30 md:static")}
           >
-            Continue <ArrowRight className="w-4 h-4" />
-          </GlassButton>
+            <GlassButton
+              size="lg"
+              className="w-full shadow-lg shadow-accent/20"
+              disabled={!detailsReady}
+              onClick={handleDetailsNext}
+            >
+              {parsedAmount <= 0
+                ? "Type an amount"
+                : !isCategoryValid
+                  ? "Pick a category"
+                  : !sharesValid
+                    ? "Check the split"
+                    : `Continue · ${formatAmount(parsedAmount)} · ${categoryLabel}`}
+              <ArrowRight className="w-4 h-4" />
+            </GlassButton>
+          </div>
         </GlassCard>
       )}
+      {step === "details" && <CategoryTypoHint />}
 
       {step === "payment" && (
         <div className="space-y-3">
@@ -1080,14 +1116,36 @@ export default function SpendPage() {
             {isToday ? "" : ` · ${dateLabel}`}
           </p>
 
-          {/* Where it landed — the same figures the Home and Between pages show. */}
-          <div className="mx-auto max-w-xs space-y-1 rounded-xl bg-black/[0.04] px-3 py-2 text-left text-[12px] dark:bg-white/[0.06]">
+          {/* Where it landed: the amount drops into the account it came from, and
+              that balance rolls to its new figure — the same one Home shows. */}
+          <div className="relative mx-auto max-w-xs">
+            {still ? null : (
+              <motion.span
+                key={`drop-${saved.ids.join()}`}
+                aria-hidden
+                className={cn(
+                  "pointer-events-none absolute left-1/2 -top-5 z-10 -translate-x-1/2 rounded-full px-2.5 py-0.5 text-[12px] font-bold tabular-nums shadow-md",
+                  saved.refund ? "bg-positive text-white" : "bg-accent text-white"
+                )}
+                initial={{ y: -26, opacity: 0, scale: 0.8 }}
+                animate={{ y: [-26, 0, 0, 22], opacity: [0, 1, 1, 0], scale: [0.8, 1, 1, 0.55] }}
+                transition={{ duration: 1, times: [0, 0.3, 0.55, 1], ease: "easeInOut" }}
+              >
+                {saved.refund ? "+" : "-"}
+                {formatAmount(saved.amount)}
+              </motion.span>
+            )}
+          <div className="space-y-1 rounded-xl bg-black/[0.04] px-3 py-2 text-left text-[12px] dark:bg-white/[0.06]">
             {savedAccounts.map((account) => (
               <p key={account.id} className="flex items-center justify-between gap-2">
                 <span className="truncate text-muted">
                   {account.name} {account.type === "credit" ? "balance" : "now"}
                 </span>
-                <span className="font-semibold tabular-nums">{formatCurrency(account.balance)}</span>
+                <RollingMoney
+                  from={saved.before[account.id] ?? account.balance}
+                  to={account.balance}
+                  className="font-semibold"
+                />
               </p>
             ))}
             <p className="flex items-center justify-between gap-2">
@@ -1098,6 +1156,7 @@ export default function SpendPage() {
                 {betweenNow.amount > 0 ? formatCurrency(betweenNow.amount) : "settled"}
               </span>
             </p>
+          </div>
           </div>
 
           {undoLeft > 0 ? (

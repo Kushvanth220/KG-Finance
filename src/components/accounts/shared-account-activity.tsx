@@ -7,7 +7,7 @@ import { GlassButton } from "@/components/ui/glass-button";
 import { GlassModal } from "@/components/ui/glass-modal";
 import { getGreenDotAccounts } from "@/lib/account-activity";
 import { getGreenDotParts } from "@/lib/accounts";
-import { formatCurrency, formatDate, formatDateTime } from "@/lib/formatters";
+import { formatAmount, formatCurrency, formatDate, formatDateTime } from "@/lib/formatters";
 import { accountMovesSince, balancesAtStartOf } from "@/lib/running-balance";
 import { zonedMonth, zonedToday } from "@/lib/zoned-date";
 import { useFinanceStore } from "@/store/finance-store";
@@ -25,9 +25,9 @@ import { cn } from "@/lib/utils";
 /** Entries shown before "Show all". */
 const FOLD = 7;
 
-/** "+$20.00" / "-$15.00", written as formatCurrency writes it. */
+/** "+$20.00" / "-$15.00": always with cents, so the column lines up. */
 function signed(value: number) {
-  return `${value < 0 ? "-" : "+"}${formatCurrency(Math.abs(value))}`;
+  return `${value < 0 ? "-" : "+"}${formatAmount(Math.abs(value))}`;
 }
 
 /** What an entry was, in a few words. */
@@ -168,7 +168,7 @@ export function SharedAccountActivity() {
                       {signed(move.change)}
                     </p>
                     <p className={cn("text-[10px] tabular-nums", move.balance < 0 ? "text-negative" : "text-muted")}>
-                      {formatCurrency(move.balance)} left
+                      {formatAmount(move.balance)} left
                     </p>
                   </div>
                 </li>

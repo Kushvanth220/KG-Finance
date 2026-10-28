@@ -2,11 +2,11 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Filter, RotateCcw, Trash2, Wallet } from "lucide-react";
+import { Filter, RotateCcw, Search, X } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { listRow, transition } from "@/lib/motion-presets";
 import { DeletedHistoryCard } from "@/components/history/deleted-history-card";
-import { ActiveTransactionDetails } from "@/components/history/active-transaction-details";
+import { HistoryRow } from "@/components/history/history-row";
 import { CompactPageShell } from "@/components/ui/compact-page-shell";
 import { Sparkline } from "@/components/art/page-art";
 import { formatShortDate } from "@/lib/formatters";
@@ -21,17 +21,22 @@ import {
 } from "@/components/ui/month-range-filter";
 import { useFinanceStore, getFinanceState } from "@/store/finance-store";
 import { getAvailableMonthKeys } from "@/lib/calculations";
-import { formatCurrency, formatDateTime, compareByDateTime, isWithinDateRange } from "@/lib/formatters";
 import {
-  getTransactionDisplayMessage,
-  getTransactionActor,
-  isMoneyIn,
-  isRefund,
-} from "@/lib/transaction-messages";
+  compareByDateTime,
+  formatAmount,
+  formatCurrency,
+  formatDate,
+  formatTime,
+  isWithinDateRange,
+  parseAppDateTime,
+} from "@/lib/formatters";
+import { getTransactionDisplayMessage, getTransactionActor, isMoneyIn } from "@/lib/transaction-messages";
 import { forcePushNow, getActiveWorkspaceId } from "@/lib/supabase/sync";
 import { accountLabel } from "@/lib/accounts";
-import { balancesAfter, type BalanceAfter } from "@/lib/running-balance";
-import { PERSON_LABELS, type Account, type Person, type Transaction, type TransactionType } from "@/types";
+import { groupByDay, historyIcon, historyTitle, matchesSearch } from "@/lib/history-rows";
+import { balancesAfter } from "@/lib/running-balance";
+import { zonedToday, zonedYesterday } from "@/lib/zoned-date";
+import { PERSON_LABELS, type Person, type Transaction, type TransactionType } from "@/types";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
@@ -47,39 +52,12 @@ const typeLabels: Record<TransactionType, string> = {
   balance_adjustment: "Adjust",
 };
 
-const typeColors: Record<TransactionType, string> = {
-  income: "text-positive",
-  expense: "text-negative",
-  transfer: "text-indigo",
-  cash_withdrawal: "text-caution",
-  cash_deposit: "text-positive",
-  debt_payment: "text-accent",
-  credit_payment: "text-accent",
-  settlement: "text-feature",
-  balance_adjustment: "text-muted",
-};
-
-/** "BofA $541.61 left" — or "Discover $450.00 owed" — for each account a row moved. */
-function LeftAfter({ left, accounts }: { left: BalanceAfter[]; accounts: Map<string, Account> }) {
-  return (
-    <p className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[10px] text-muted tabular-nums">
-      {left.map(({ accountId, balance }) => {
-        const account = accounts.get(accountId);
-        if (!account) return null;
-        const credit = account.type === "credit";
-        return (
-          <span key={accountId} className="inline-flex items-center gap-1">
-            <Wallet className="h-3 w-3 shrink-0" aria-hidden />
-            {accountLabel(account)}
-            <span className={cn("font-semibold", (credit ? balance > 0 : balance < 0) ? "text-negative" : "text-foreground")}>
-              {formatCurrency(balance)}
-            </span>
-            {credit ? "owed" : "left"}
-          </span>
-        );
-      })}
-    </p>
-  );
+/** "Today · Mon 10/26", "Yesterday · Sun 10/25", or "Sat · 10/24/2026". */
+function dayLabel(date: string): string {
+  const day = format(parseAppDateTime(date), "EEE");
+  if (date === zonedToday()) return `Today · ${day} ${formatDate(date).slice(0, 5)}`;
+  if (date === zonedYesterday()) return `Yesterday · ${day} ${formatDate(date).slice(0, 5)}`;
+  return `${day} · ${formatDate(date)}`;
 }
 
 export default function HistoryPage() {
@@ -124,8 +102,10 @@ function HistoryPageContent({
   personParam: string | null;
 }) {
 
-  const { accounts, transactions, incomeEntries, deletedHistory, deleteTransaction, resetAllData } =
+  const { accounts, spendCategories, transactions, incomeEntries, deletedHistory, deleteTransaction, resetAllData } =
     useFinanceStore();
+  // Words or an amount to find a row by, across every field it has.
+  const [query, setQuery] = useState("");
   // What each row left in its accounts, worked back from today's balances.
   const leftAfter = useMemo(() => balancesAfter(accounts, transactions), [accounts, transactions]);
   const accountsById = useMemo(() => new Map(accounts.map((account) => [account.id, account])), [accounts]);
@@ -248,7 +228,18 @@ function HistoryPageContent({
     .filter((t) => typeFilter === "all" || t.type === typeFilter)
     .filter((t) => !categoryParam || (t.category ?? "Other") === categoryParam)
     .filter((t) => isWithinDateRange(t, bounds.start, bounds.end))
+    .filter((t) => matchesSearch(t, query, rowAccounts(t)))
     .sort(compareByDateTime);
+  // Newest day first, each with what went out and came in.
+  const dayGroups = groupByDay(filtered);
+
+  /** The accounts a row touched, by the names the page shows, so a search for "green dot" finds them. */
+  function rowAccounts(t: Transaction): string[] {
+    return [t.accountId, t.sourceAccountId, t.targetAccountId].flatMap((id) => {
+      const account = id ? accountsById.get(id) : undefined;
+      return account ? [account.name, accountLabel(account)] : [];
+    });
+  }
 
   const filteredDeleted = (deletedHistory ?? [])
     .filter((record) => {
@@ -352,6 +343,26 @@ function HistoryPageContent({
           })()
         : null}
 
+      {view === "active" ? (
+        <label htmlFor="history-search" className="glass flex items-center gap-2 rounded-xl px-3 py-2">
+          <Search className="h-3.5 w-3.5 shrink-0 text-muted" aria-hidden />
+          <input
+            id="history-search"
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search: food, Costco, Green Dot, 19.67"
+            autoComplete="off"
+            className="min-w-0 flex-1 bg-transparent text-xs outline-none"
+          />
+          {query ? (
+            <button type="button" onClick={() => setQuery("")} className="text-muted hover:text-foreground" aria-label="Clear the search">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          ) : null}
+        </label>
+      ) : null}
+
       <div className="glass rounded-xl px-3 py-2 flex items-center gap-2">
         <Filter className="w-3.5 h-3.5 text-muted shrink-0" />
         <select
@@ -369,7 +380,14 @@ function HistoryPageContent({
       </div>
 
       {hasDateFilter ? (
-        <p className="text-[10px] text-muted px-1">Filtered: {bounds.label}</p>
+        <p className="flex items-center gap-1.5 px-1 text-[10px] text-muted">
+          {query ? `Searching ${bounds.label} only` : `Filtered: ${bounds.label}`}
+          {query ? (
+            <button type="button" onClick={() => setDateRange({ ...dateRange, mode: "all" })} className="font-semibold text-accent">
+              Search every month
+            </button>
+          ) : null}
+        </p>
       ) : null}
 
       {linkedHighlightId ? (
@@ -382,7 +400,7 @@ function HistoryPageContent({
         </p>
       ) : null}
 
-      <GlassCard className="!p-0 divide-y divide-black/5 dark:divide-white/10">
+      <GlassCard className="!p-0 overflow-hidden divide-y divide-black/5 dark:divide-white/10">
         {view === "deleted" ? (
           filteredDeleted.length === 0 ? (
             <p className="text-xs text-muted p-4 text-center">No deleted records</p>
@@ -401,80 +419,72 @@ function HistoryPageContent({
             ))
           )
         ) : filtered.length === 0 ? (
-          <p className="text-xs text-muted p-4 text-center">No transactions</p>
+          <div className="p-4 text-center text-xs text-muted">
+            {query ? (
+              <>
+                Nothing matches &ldquo;{query}&rdquo;.{" "}
+                <button type="button" onClick={() => setQuery("")} className="font-semibold text-accent">
+                  Clear the search
+                </button>
+              </>
+            ) : (
+              "No transactions"
+            )}
+          </div>
         ) : (
           <AnimatePresence initial={false}>
-          {filtered.map((transaction) => {
-            const refund = isRefund(transaction);
-            const isPositive = isMoneyIn(transaction);
-            const message = getTransactionDisplayMessage(transaction);
-            const actor = getTransactionActor(transaction);
-
-            return (
-              <motion.div
-                key={transaction.id}
-                id={`history-txn-${transaction.id}`}
-                layout={still ? false : "position"}
-                variants={still ? undefined : listRow}
-                initial={still ? false : "hidden"}
-                animate={still ? undefined : "shown"}
-                exit={still ? undefined : "gone"}
-                transition={transition}
-                className={cn(
-                  "flex items-start justify-between overflow-hidden px-3 py-2.5 gap-2 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]",
-                  linkedHighlightId === transaction.id &&
-                    "bg-accent/10 ring-2 ring-inset ring-accent/40"
-                )}
+            {dayGroups.flatMap((day) => [
+              // Each day under one heading with what went out and came in, newest first.
+              <div
+                key={`day-${day.date}`}
+                className="flex items-baseline justify-between gap-2 bg-black/[0.02] px-3 pb-1.5 pt-3 dark:bg-white/[0.02]"
               >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-accent/15 text-accent">
-                      {PERSON_LABELS[actor]}
-                    </span>
-                    <span
-                      className={cn(
-                        "text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-black/5 dark:bg-white/5",
-                        refund ? "text-positive" : typeColors[transaction.type]
-                      )}
-                    >
-                      {refund ? "Refund" : typeLabels[transaction.type]}
-                    </span>
-                    <span className="text-[10px] text-muted">
-                      {formatDateTime(transaction.date, transaction.time, transaction.timestamp)}
-                    </span>
-                  </div>
-                  <p className="font-medium mt-1 text-xs leading-snug">{message}</p>
-                  {leftAfter.has(transaction.id) ? (
-                    <LeftAfter left={leftAfter.get(transaction.id)!} accounts={accountsById} />
-                  ) : null}
-                  <ActiveTransactionDetails transaction={transaction} />
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <span
-                    className={cn(
-                      "text-xs font-semibold tabular-nums whitespace-nowrap",
-                      isPositive ? "text-positive" : "text-foreground"
-                    )}
+                <span className="text-[10.5px] font-semibold uppercase tracking-wide text-muted">{dayLabel(day.date)}</span>
+                <span className="text-[10.5px] tabular-nums text-muted">
+                  {day.out > 0 ? `${formatAmount(day.out)} out` : null}
+                  {day.out > 0 && day.in > 0 ? " · " : null}
+                  {day.in > 0 ? <span className="text-positive">+{formatAmount(day.in)} in</span> : null}
+                </span>
+              </div>,
+              ...day.rows.map((transaction) => {
+                const moneyIn = isMoneyIn(transaction);
+                const accountId = transaction.type === "transfer" ? transaction.sourceAccountId : transaction.accountId;
+                const account = accountId ? accountsById.get(accountId) : undefined;
+                const meta = [
+                  PERSON_LABELS[getTransactionActor(transaction)],
+                  account ? accountLabel(account) : transaction.paymentMethod,
+                  formatTime(transaction.date, transaction.time ?? "", transaction.timestamp),
+                ]
+                  .filter(Boolean)
+                  .join(" · ");
+                return (
+                  <motion.div
+                    key={transaction.id}
+                    id={`history-txn-${transaction.id}`}
+                    layout={still ? false : "position"}
+                    variants={still ? undefined : listRow}
+                    initial={still ? false : "hidden"}
+                    animate={still ? undefined : "shown"}
+                    exit={still ? undefined : "gone"}
+                    transition={transition}
+                    className={cn(linkedHighlightId === transaction.id && "bg-accent/10 ring-2 ring-inset ring-accent/40")}
                   >
-                    {/* A move between your own accounts is neither in nor out. */}
-                    {isPositive ? "+" : transaction.type === "transfer" ? "" : "-"}
-                    {formatCurrency(Math.abs(transaction.amount))}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      openDeleteConfirm(transaction);
-                    }}
-                    className="text-muted hover:text-negative p-1.5 rounded-lg hover:bg-negative/10"
-                    aria-label="Delete transaction"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </motion.div>
-            );
-          })}
+                    <HistoryRow
+                      transaction={transaction}
+                      icon={historyIcon(transaction, spendCategories)}
+                      title={historyTitle(transaction)}
+                      meta={meta}
+                      // A move between your own accounts is neither in nor out.
+                      amount={`${moneyIn ? "+" : transaction.type === "transfer" ? "" : "-"}${formatAmount(Math.abs(transaction.amount))}`}
+                      amountTone={moneyIn ? "text-positive" : undefined}
+                      left={leftAfter.get(transaction.id)}
+                      accounts={accountsById}
+                      onDelete={() => openDeleteConfirm(transaction)}
+                    />
+                  </motion.div>
+                );
+              }),
+            ])}
           </AnimatePresence>
         )}
       </GlassCard>

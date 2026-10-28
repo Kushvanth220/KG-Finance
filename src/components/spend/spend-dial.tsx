@@ -179,7 +179,10 @@ export function SpendDial({
               <span aria-hidden className="text-[15px] leading-none">
                 {face.emoji}
               </span>
-              <span className="w-full truncate px-0.5 text-center">{slot.category.name}</span>
+              {/* Two short lines, not one cut-off line: "Cash withd…" told nobody which category it was. */}
+              <span className="line-clamp-2 w-full break-words px-0.5 text-center text-[10px] [text-wrap:balance]">
+                {slot.category.name}
+              </span>
             </button>
           );
         })}

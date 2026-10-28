@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { useReducedMotion } from "motion/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { AnimatedMoney } from "@/components/ui/animated-number";
 import { ACCOUNT_TYPE_META } from "@/components/accounts/account-type-meta";
@@ -40,6 +41,46 @@ function isPhoneLayout() {
   return window.matchMedia("(max-width: 767px)").matches;
 }
 
+/**
+ * The tile grows into the wallet card instead of the screen cutting to it. A
+ * plain shape in the tile's colours is laid out where the card opens and
+ * played back from the tile (transform and opacity only, which a phone runs on
+ * its own), and the wallet appears under it as it fades.
+ */
+function growInto(from: HTMLElement, tint: string, open: () => void) {
+  const box = from.getBoundingClientRect();
+  const width = Math.min(window.innerWidth - 32, 448) - 24;
+  const height = 236;
+  const left = (window.innerWidth - width) / 2;
+  const top = Math.max(64, window.innerHeight * 0.18);
+  const ghost = document.createElement("div");
+  Object.assign(ghost.style, {
+    position: "fixed",
+    left: `${left}px`,
+    top: `${top}px`,
+    width: `${width}px`,
+    height: `${height}px`,
+    borderRadius: "var(--card-radius)",
+    zIndex: "85",
+    pointerEvents: "none",
+    transformOrigin: "0 0",
+    background: `linear-gradient(140deg, color-mix(in srgb, ${tint} 24%, var(--modal-surface)), color-mix(in srgb, ${tint} 6%, var(--modal-surface)) 72%)`,
+    boxShadow: "var(--glass-shadow)",
+  });
+  document.body.appendChild(ghost);
+  const grow = ghost.animate(
+    [
+      { transform: `translate(${box.left - left}px, ${box.top - top}px) scale(${box.width / width}, ${box.height / height})`, opacity: 0.9 },
+      { transform: "none", opacity: 1, offset: 0.7 },
+      { transform: "none", opacity: 0 },
+    ],
+    { duration: 600, easing: "cubic-bezier(0.16, 1, 0.3, 1)" }
+  );
+  window.setTimeout(open, 320);
+  const done = () => ghost.remove();
+  grow.finished.then(done, done);
+}
+
 function AccountCard({
   account,
   cardTotal,
@@ -48,22 +89,24 @@ function AccountCard({
   account: Account;
   /** For a part of the Green Dot card: what the whole card holds. */
   cardTotal: number | null;
-  onOpen: (accountId: string) => void;
+  onOpen: (accountId: string, from: HTMLElement | null, tint: string) => void;
 }) {
   const meta = ACCOUNT_TYPE_META[account.type];
   const Icon = meta.icon;
   const isCard = account.type === "credit";
   const left = isCard && account.creditLimit ? account.creditLimit - account.balance : null;
+  const tile = useRef<HTMLAnchorElement>(null);
 
   return (
     <Link
+      ref={tile}
       href={isCard ? "/debts" : "/accounts"}
       // onNavigate, not onClick: a Cmd/Ctrl-click still opens the page in a
       // new tab, and only an ordinary tap on a phone becomes the wallet.
       onNavigate={(event) => {
         if (!isPhoneLayout()) return;
         event.preventDefault();
-        onOpen(account.id);
+        onOpen(account.id, tile.current, meta.tint);
       }}
       className="tap-card flex min-w-0 flex-col justify-between overflow-hidden rounded-xl border border-black/5 px-2.5 py-2 dark:border-white/10"
       style={{
@@ -103,6 +146,7 @@ function AccountCard({
 
 export function AccountBalances({ person }: { person: Person }) {
   const accounts = useFinanceStore((state) => state.accounts);
+  const still = useReducedMotion();
   const [showAll, setShowAll] = useState(false);
   const [walletAt, setWalletAt] = useState<string | null>(null);
 
@@ -168,7 +212,10 @@ export function AccountBalances({ person }: { person: Person }) {
             key={account.id}
             account={account}
             cardTotal={isGreenDotPart(account) ? cardTotal : null}
-            onOpen={setWalletAt}
+            onOpen={(id, from, tint) => {
+              if (still || !from) setWalletAt(id);
+              else growInto(from, tint, () => setWalletAt(id));
+            }}
           />
         ))}
       </div>

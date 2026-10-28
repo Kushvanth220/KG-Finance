@@ -47,6 +47,23 @@ export function formatCurrency(amount: number): string {
   return (hasCents ? DOLLARS_AND_CENTS : DOLLARS).format(amount);
 }
 
+/**
+ * An amount in a list: always with its cents. "$15" above "$19.67" leaves the
+ * column ragged and the eye hunting; "$15.00" lines up. Headline figures keep
+ * formatCurrency's compact whole dollars.
+ */
+export function formatAmount(amount: number): string {
+  return DOLLARS_AND_CENTS.format(Math.abs(amount) < 0.005 ? 0 : amount);
+}
+
+/** How late something is, the way a person says it: "5h late", "1 day late", "12 days late". */
+export function formatLateness(hours: number): string {
+  if (hours < 1) return "due now";
+  if (hours < 24) return `${Math.floor(hours)}h late`;
+  const days = Math.floor(hours / 24);
+  return `${days} day${days === 1 ? "" : "s"} late`;
+}
+
 export function formatPercent(value: number): string {
   return `${value.toFixed(1)}%`;
 }

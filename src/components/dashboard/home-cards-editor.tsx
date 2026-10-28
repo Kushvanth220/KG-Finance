@@ -83,7 +83,7 @@ const isChartType = (value: unknown): value is FlexChartType =>
   CHART_TYPE_OPTIONS.some((option) => option.value === value);
 
 /** Save a layout for every device, keeping whatever part of it isn't changing. */
-function saveLayout(change: { prefs?: HomeCardPrefs; chart?: [HomeChart, FlexChartType] }) {
+function saveLayout(change: { prefs?: HomeCardPrefs; chart?: [HomeChart, FlexChartType]; nav?: string[] }) {
   const store = useFinanceStore.getState();
   const current = store.homeLayout;
   const prefs = change.prefs ?? (current ? normalizeCardPrefs(current) : readPrefs());
@@ -93,7 +93,18 @@ function saveLayout(change: { prefs?: HomeCardPrefs; chart?: [HomeChart, FlexCha
     ...current?.charts,
     ...(change.chart ? { [change.chart[0]]: change.chart[1] } : {}),
   };
-  store.setHomeLayout({ order: prefs.order, hidden: prefs.hidden, charts });
+  const nav = change.nav ?? current?.nav;
+  store.setHomeLayout({ order: prefs.order, hidden: prefs.hidden, charts, ...(nav ? { nav } : {}) });
+}
+
+/** The tab bar's three pages beside Spend, as saved for the workspace; null for the usual ones. */
+export function useSharedNav(): string[] | null {
+  return useSharedLayout()?.nav ?? null;
+}
+
+/** Save the tab bar's pages for every device. */
+export function saveNav(nav: string[]) {
+  saveLayout({ nav });
 }
 
 /**

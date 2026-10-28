@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Mic, Radio } from "lucide-react";
 import { AssistantWorkspace } from "@/components/assistant/workspace/assistant-workspace";
 import { AssistantLiveOrb } from "@/components/assistant/assistant-live-orb";
@@ -16,8 +17,49 @@ import {
 } from "@/store/assistant-preferences-store";
 import { cn } from "@/lib/utils";
 
+/**
+ * Whether the button should step aside: true while the page is being scrolled
+ * down (reading on), false the moment it is scrolled up a little, near the top,
+ * or on a new page. It used to sit over the same spot on every page, on top of
+ * amounts and buttons.
+ */
+function useTuckedWhileScrolling(): boolean {
+  const pathname = usePathname();
+  const pathRef = useRef(pathname);
+  useEffect(() => {
+    pathRef.current = pathname;
+  }, [pathname]);
+  // Remembered with the page it happened on, so a new page always starts with the button out.
+  const [tuckedOn, setTuckedOn] = useState<string | null>(null);
+
+  useEffect(() => {
+    let last = window.scrollY;
+    let frame = 0;
+    const onScroll = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        const y = window.scrollY;
+        // A few pixels of jitter is not a direction.
+        if (Math.abs(y - last) < 8) return;
+        const down = y > last;
+        last = y;
+        setTuckedOn(down && y > 80 ? pathRef.current : null);
+      });
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      cancelAnimationFrame(frame);
+    };
+  }, []);
+
+  return tuckedOn === pathname;
+}
+
 export function AssistantFloatingButton() {
   const { open, openAssistant, autoStartVoice } = useAssistant();
+  const tucked = useTuckedWhileScrolling();
   const namingCompleted = useAssistantPreferencesStore((state) => state.namingCompleted);
   const assistantName = useAssistantPreferencesStore((state) => state.assistantName);
   const wakeEnabled = useAssistantPreferencesStore((state) => state.wakeListeningEnabled);
@@ -40,8 +82,9 @@ export function AssistantFloatingButton() {
 
       {!open ? (
       <div
-        className="fixed z-50 right-4 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] md:bottom-8 md:right-8 flex flex-col items-end gap-2.5 pointer-events-none"
+        className="kg-fab fixed z-50 right-4 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] md:bottom-8 md:right-8 flex flex-col items-end gap-2.5 pointer-events-none"
         style={{ viewTransitionName: "kg-assistant" }}
+        data-tucked={tucked && !liveNow}
       >
         {canWakeByName ? (
           <button

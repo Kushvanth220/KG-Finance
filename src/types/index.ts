@@ -266,6 +266,8 @@ export interface HomeLayout {
   order: string[];
   hidden: string[];
   charts?: { income?: string; spend?: string };
+  /** The three pages in the tab bar beside Spend, as paths ("/", "/history"). */
+  nav?: string[];
   /** When it was last changed: the newer layout wins when two devices both edited it. */
   updatedAt: string;
 }
